@@ -6,6 +6,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 
+typedef Channel = Map<String, String>;
+typedef DataMap = Map<String, Map<String, List<Channel>>>;
+
+DataMap _emptyData() => {
+      'live': {'الكل': <Channel>[]},
+      'movies': {'الكل': <Channel>[]},
+      'series': {'الكل': <Channel>[]},
+    };
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([
@@ -51,13 +60,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String _status = 'جاهز';
   String _selectedCat = 'الكل';
 
-  Map<String, Map<String, List>>> _data = {
-    'live': {'الكل': []},
-    'movies': {'الكل': []},
-    'series': {'الكل': []},
-  };
+  DataMap _data = _emptyData();
 
-  List> _currentChannels = [];
+  List<Channel> _currentChannels = [];
   VideoPlayerController? _videoController;
   ChewieController? _chewieController;
   String _nowPlaying = 'اختر قناة لبدء البث';
@@ -96,80 +101,88 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _status = 'جاري جلب القنوات والأفلام...');
     final headers = {'User-Agent': 'IPTVSmartersPlayer'};
 
-    Map<String, Map<String, List>>> temp = {
-      'live': {'الكل': []},
-      'movies': {'الكل': []},
-      'series': {'الكل': []},
-    };
+    DataMap temp = _emptyData();
 
     try {
       // 1. Live TV
-      final lCatRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_live_categories'), headers: headers);
+      final lCatRes = await http.get(
+          Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_live_categories'),
+          headers: headers);
       Map<String, String> lCats = {};
       if (lCatRes.statusCode == 200) {
         for (var c in jsonDecode(lCatRes.body)) {
           lCats[c['category_id'].toString()] = c['category_name'].toString();
         }
       }
-      final liveRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_live_streams'), headers: headers);
+      final liveRes = await http.get(
+          Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_live_streams'),
+          headers: headers);
       if (liveRes.statusCode == 200) {
         for (var st in jsonDecode(liveRes.body)) {
           String grp = lCats[st['category_id'].toString()] ?? 'Live TV';
           String sid = st['stream_id'].toString();
-          var item = {
+          Channel item = {
             'name': st['name'].toString(),
             'url': '$h/live/$u/$p/$sid.ts',
             'group': grp
           };
           temp['live']!['الكل']!.add(item);
-          temp['live']!.putIfAbsent(grp, () => []).add(item);
+          temp['live']!.putIfAbsent(grp, () => <Channel>[]).add(item);
         }
       }
 
       // 2. Movies (VOD)
-      final vCatRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_vod_categories'), headers: headers);
+      final vCatRes = await http.get(
+          Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_vod_categories'),
+          headers: headers);
       Map<String, String> vCats = {};
       if (vCatRes.statusCode == 200) {
         for (var c in jsonDecode(vCatRes.body)) {
           vCats[c['category_id'].toString()] = c['category_name'].toString();
         }
       }
-      final vodRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_vod_streams'), headers: headers);
+      final vodRes = await http.get(
+          Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_vod_streams'),
+          headers: headers);
       if (vodRes.statusCode == 200) {
         for (var st in jsonDecode(vodRes.body)) {
           String grp = vCats[st['category_id'].toString()] ?? 'Movies';
           String sid = st['stream_id'].toString();
           String ext = (st['container_extension'] ?? 'mp4').toString();
-          var item = {
+          Channel item = {
             'name': st['name'].toString(),
             'url': '$h/movie/$u/$p/$sid.$ext',
             'group': grp
           };
           temp['movies']!['الكل']!.add(item);
-          temp['movies']!.putIfAbsent(grp, () => []).add(item);
+          temp['movies']!.putIfAbsent(grp, () => <Channel>[]).add(item);
         }
       }
 
       // 3. Series
-      final sCatRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_series_categories'), headers: headers);
+      final sCatRes = await http.get(
+          Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_series_categories'),
+          headers: headers);
       Map<String, String> sCats = {};
       if (sCatRes.statusCode == 200) {
         for (var c in jsonDecode(sCatRes.body)) {
           sCats[c['category_id'].toString()] = c['category_name'].toString();
         }
       }
-      final serRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_series'), headers: headers);
+      final serRes = await http.get(
+          Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_series'),
+          headers: headers);
       if (serRes.statusCode == 200) {
         for (var st in jsonDecode(serRes.body)) {
           String grp = sCats[st['category_id'].toString()] ?? 'Series';
           String sid = st['series_id'].toString();
-          var item = {
+          Channel item = {
             'name': '🍿 ${st['name']}',
             'url': 'series://$h|$u|$p|$sid',
             'group': grp
           };
           temp['series']!['الكل']!.add(item);
-          temp['series']!.putIfAbsent(grp, () => []).add(item);
+          temp['series']!.putIfAbsent(grp, () => <Channel>[]).add(item);
         }
       }
 
@@ -192,13 +205,10 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _status = 'جاري تحميل M3U...');
 
     try {
-      final res = await http.get(Uri.parse(url), headers: {'User-Agent': 'IPTVSmartersPlayer'});
+      final res = await http.get(Uri.parse(url),
+          headers: {'User-Agent': 'IPTVSmartersPlayer'});
       if (res.statusCode == 200) {
-        Map<String, Map<String, List>>> temp = {
-          'live': {'الكل': []},
-          'movies': {'الكل': []},
-          'series': {'الكل': []},
-        };
+        DataMap temp = _emptyData();
         String curName = 'Channel';
         String curGrp = 'General';
         final grpReg = RegExp(r'group-title="([^"]*)"', caseSensitive: false);
@@ -212,11 +222,13 @@ class _HomeScreenState extends State<HomeScreen> {
             curName = parts.length > 1 ? parts.sublist(1).join(',').trim() : 'Stream';
           } else if (line.startsWith('http')) {
             String sec = 'live';
-            if (line.contains('/movie/') || line.endsWith('.mp4') || line.endsWith('.mkv')) sec = 'movies';
+            if (line.contains('/movie/') || line.endsWith('.mp4') || line.endsWith('.mkv')) {
+              sec = 'movies';
+            }
             if (line.contains('/series/')) sec = 'series';
-            var item = {'name': curName, 'url': line, 'group': curGrp};
+            Channel item = {'name': curName, 'url': line, 'group': curGrp};
             temp[sec]!['الكل']!.add(item);
-            temp[sec]!.putIfAbsent(curGrp, () => []).add(item);
+            temp[sec]!.putIfAbsent(curGrp, () => <Channel>[]).add(item);
           }
         }
         setState(() {
@@ -231,7 +243,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _playChannel(Map<String, String> ch) async {
+  Future<void> _playChannel(Channel ch) async {
     String url = ch['url']!;
     if (url.startsWith('series://')) {
       _loadSeriesEpisodes(url);
@@ -293,7 +305,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         final epsMap = decoded['episodes'];
-        List> epList = [];
+        List<Channel> epList = [];
         if (epsMap is Map) {
           epsMap.forEach((season, eps) {
             for (var ep in eps) {
@@ -320,25 +332,40 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xFF12151F),
-        title: const Text('إعدادات السيرفر - DINO ALLACH', style: TextStyle(color: Color(0xFFF5C518))),
+        title: const Text('إعدادات السيرفر - DINO ALLACH',
+            style: TextStyle(color: Color(0xFFF5C518))),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: _hostCtrl, decoration: const InputDecoration(labelText: 'Host (http://server:8080)')),
-              TextField(controller: _userCtrl, decoration: const InputDecoration(labelText: 'Username')),
-              TextField(controller: _passCtrl, decoration: const InputDecoration(labelText: 'Password')),
+              TextField(
+                  controller: _hostCtrl,
+                  decoration: const InputDecoration(labelText: 'Host (http://server:8080)')),
+              TextField(
+                  controller: _userCtrl,
+                  decoration: const InputDecoration(labelText: 'Username')),
+              TextField(
+                  controller: _passCtrl,
+                  decoration: const InputDecoration(labelText: 'Password')),
               const SizedBox(height: 12),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE50914)),
-                onPressed: () { Navigator.pop(context); _loginXtream(); },
+                onPressed: () {
+                  Navigator.pop(context);
+                  _loginXtream();
+                },
                 child: const Text('اتصال بـ Xtream Codes'),
               ),
               const Divider(height: 24),
-              TextField(controller: _m3uCtrl, decoration: const InputDecoration(labelText: 'أو رابط M3U مباشر')),
+              TextField(
+                  controller: _m3uCtrl,
+                  decoration: const InputDecoration(labelText: 'أو رابط M3U مباشر')),
               const SizedBox(height: 10),
               ElevatedButton(
-                onPressed: () { Navigator.pop(context); _loadM3U(); },
+                onPressed: () {
+                  Navigator.pop(context);
+                  _loadM3U();
+                },
                 child: const Text('تحميل M3U'),
               ),
             ],
@@ -358,9 +385,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final cats = _data[_currentTab]!.keys.toList();
-    final filteredChannels = _currentChannels.where((c) =>
-      c['name']!.toLowerCase().contains(_searchCtrl.text.toLowerCase())
-    ).toList();
+    final filteredChannels = _currentChannels
+        .where((c) => c['name']!.toLowerCase().contains(_searchCtrl.text.toLowerCase()))
+        .toList();
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -376,7 +403,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     const Text(
                       '⚡ DINO ALLACH PRO',
-                      style: TextStyle(color: Color(0xFFF5C518), fontSize: 18, fontWeight: FontWeight.w900),
+                      style: TextStyle(
+                          color: Color(0xFFF5C518), fontSize: 18, fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(width: 14),
                     _tabBtn('live', '📺 مباشر (${_data['live']!['الكل']!.length})'),
@@ -385,7 +413,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(width: 8),
                     _tabBtn('series', '🍿 مسلسلات (${_data['series']!['الكل']!.length})'),
                     const Spacer(),
-                    Text(_status, style: const TextStyle(color: Color(0xFFF5C518), fontSize: 12)),
+                    Text(_status,
+                        style: const TextStyle(color: Color(0xFFF5C518), fontSize: 12)),
                     const SizedBox(width: 10),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE50914)),
@@ -413,7 +442,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             dense: true,
                             selected: sel,
                             selectedTileColor: const Color(0xFFE50914),
-                            title: Text('$c (${_data[_currentTab]![c]!.length})', style: const TextStyle(fontSize: 13)),
+                            title: Text('$c (${_data[_currentTab]![c]!.length})',
+                                style: const TextStyle(fontSize: 13)),
                             onTap: () {
                               setState(() {
                                 _selectedCat = c;
@@ -449,7 +479,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 final ch = filteredChannels[i];
                                 return ListTile(
                                   dense: true,
-                                  title: Text('${i + 1}. ${ch['name']}', style: const TextStyle(fontSize: 13)),
+                                  title: Text('${i + 1}. ${ch['name']}',
+                                      style: const TextStyle(fontSize: 13)),
                                   onTap: () => _playChannel(ch),
                                 );
                               },
@@ -465,13 +496,17 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           children: [
                             Expanded(
-                              child: _chewieController != null && _videoController!.value.isInitialized
+                              child: _chewieController != null &&
+                                      _videoController!.value.isInitialized
                                   ? Chewie(controller: _chewieController!)
                                   : const Center(
                                       child: Text(
                                         'DINO ALLACH PLAYER\nExoPlayer Native Engine',
                                         textAlign: TextAlign.center,
-                                        style: TextStyle(color: Colors.white38, fontSize: 18, fontWeight: FontWeight.bold),
+                                        style: TextStyle(
+                                            color: Colors.white38,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold),
                                       ),
                                     ),
                             ),
@@ -481,7 +516,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               padding: const EdgeInsets.all(8),
                               child: Text(
                                 'يشتغل الآن: $_nowPlaying',
-                                style: const TextStyle(color: Color(0xFFF5C518), fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                    color: Color(0xFFF5C518), fontWeight: FontWeight.bold),
                               ),
                             ),
                           ],
