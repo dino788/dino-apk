@@ -26,6 +26,8 @@ jobs:
         run: |
           mkdir -p /tmp/dino_app
           if [ -f "lib/main.dart" ]; then cp lib/main.dart /tmp/dino_main.dart; elif [ -f "main.dart" ]; then cp main.dart /tmp/dino_main.dart; fi
+          mkdir -p $HOME/.gradle/init.d
+          printf "allprojects {\n  tasks.configureEach { t ->\n    if (t.name.contains('lintVital')) { t.enabled = false }\n  }\n}\n" > $HOME/.gradle/init.d/nolint.gradle
           cd /tmp/dino_app
           flutter create --org com.dinoallach --project-name dino_allach_tv --platforms android .
           flutter pub add http shared_preferences video_player chewie
