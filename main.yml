@@ -30,6 +30,8 @@ jobs:
           cd /tmp/dino_app
           flutter create --org com.dinoallach --project-name dino_allach_tv --platforms android .
           flutter pub add http shared_preferences video_player chewie
+          sed -i -E '/org.jetbrains.kotlin.android/ s/[0-9]+\.[0-9]+\.[0-9]+/2.1.0/' android/settings.gradle*
+          grep -n "kotlin.android" android/settings.gradle* || true
           if [ -f "/tmp/dino_main.dart" ]; then cp /tmp/dino_main.dart lib/main.dart; fi
           rm -rf test
           sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
