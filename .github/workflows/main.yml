@@ -1,4 +1,4 @@
-name: Build Dino Allach APK
+name: Build Dino Allach VIP APK
 
 on:
   push:
@@ -9,8 +9,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
       - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
@@ -20,21 +18,1002 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.22.3'
           channel: 'stable'
 
-      - name: Build Dino Allach APK
+      - name: Create & Inject Dino Allach VIP App
         run: |
-          mkdir -p /tmp/dino_app
-          if [ -f "lib/main.dart" ]; then cp lib/main.dart /tmp/dino_main.dart; elif [ -f "main.dart" ]; then cp main.dart /tmp/dino_main.dart; fi
-          mkdir -p $HOME/.gradle/init.d
-          printf "allprojects {\n  tasks.configureEach { t ->\n    if (t.name.contains('lintVital')) { t.enabled = false }\n  }\n}\n" > $HOME/.gradle/init.d/nolint.gradle
-          cd /tmp/dino_app
+          mkdir -p /tmp/dino_vip
+          cd /tmp/dino_vip
           flutter create --org com.dinoallach --project-name dino_allach_tv --platforms android .
           flutter pub add http shared_preferences video_player chewie
-          if [ -f "/tmp/dino_main.dart" ]; then cp /tmp/dino_main.dart lib/main.dart; fi
           rm -rf test
           sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="[^"]*"/android:label="dino allach"/g' android/app/src/main/AndroidManifest.xml
+
+          python3 - << 'PYEOF'
+          code = r'''import 'dart:async';
+          import 'dart:convert';
+          import 'package:flutter/material.dart';
+          import 'package:flutter/services.dart';
+          import 'package:http/http.dart' as http;
+          import 'package:shared_preferences/shared_preferences.dart';
+          import 'package:video_player/video_player.dart';
+          import 'package:chewie/chewie.dart';
+
+          void main() {
+            WidgetsFlutterBinding.ensureInitialized();
+            SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+            runApp(const DinoAllachVIP());
+          }
+
+          class DinoAllachVIP extends StatelessWidget {
+            const DinoAllachVIP({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                title: 'dino allach',
+                debugShowCheckedModeBanner: false,
+                theme: ThemeData.dark().copyWith(
+                  scaffoldBackgroundColor: const Color(0xFF090B10),
+                  primaryColor: const Color(0xFFE50914),
+                ),
+                home: const MainPlayerScreen(),
+              );
+            }
+          }
+
+          class MainPlayerScreen extends StatefulWidget {
+            const MainPlayerScreen({super.key});
+            @override
+            State<MainPlayerScreen> createState() => _MainPlayerScreenState();
+          }
+
+          class _MainPlayerScreenState extends State<MainPlayerScreen> {
+            final TextEditingController _hostCtrl = TextEditingController();
+            final TextEditingController _userCtrl = TextEditingController();
+            final TextEditingController _passCtrl = TextEditingController();
+            final TextEditingController _m3uCtrl = TextEditingController();
+            final TextEditingController _searchCtrl = TextEditingController();
+
+            String _lang = 'ar'; // ar, fr, en
+            String _currentTab = 'live'; // live, movies, series, fav, recent
+            String _selectedCat = 'ALL';
+            String _statusKey = 'ready';
+            String _customStatus = '';
+            int _engineIdx = 0;
+            int _aspectIdx = 0; // 0: 16:9, 1: Stretch, 2: 4:3, 3: Original
+            bool _showSidebar = true;
+            bool _antiFreeze = true;
+
+            final List> _engines = [
+              {'name': 'ExoPlayer Native (TV)', 'ua': 'ExoPlayerLib/2.19.1 (Linux; Android 13; TV)'},
+              {'name': 'IBO Player Pro Engine', 'ua': 'IBOPlayer/3.8 (Android TV; Linux)'},
+              {'name': 'IPTV Smarters Pro', 'ua': 'IPTVSmartersPlayer'},
+              {'name': 'VLC / Lavf Anti-Freeze', 'ua': 'VLC/3.0.20 LibVLC/3.0.20'},
+            ];
+
+            final List<String> _aspectNames = ['16:9', 'Stretch', '4:3', 'Auto'];
+
+            final Map<String, Map<String, String>> _i18n = {
+              'ar': {
+                'ready': 'جاهز للعمل',
+                'loading': 'جاري جلب القنوات والأفلام...',
+                'loaded': 'تم التحميل بنجاح!',
+                'error': 'خطأ في الاتصال بالسيرفر',
+                'live': '📺 مباشر',
+                'movies': '🎬 أفلام',
+                'series': '🍿 مسلسلات',
+                'fav': '⭐ المفضلة',
+                'recent': '🕒 الأخيرة',
+                'all': 'الكل',
+                'search': '🔍 بحث سريع عن قناة أو فيلم...',
+                'server': '🔑 السيرفر',
+                'playing': 'يشتغل الآن:',
+                'choose': 'اختر قناة أو فيلماً لبدء البث',
+                'reconnecting': '⚡ إعادة تثبيت البث تلقائياً...',
+                'server_title': 'إعدادات السيرفر - DINO ALLACH PRO',
+                'connect_xtream': 'اتصال بـ Xtream Codes',
+                'or_m3u': 'أو رابط M3U مباشر',
+                'load_m3u': 'تحميل قائمة M3U',
+                'hide_list': 'إخفاء القائمة',
+                'show_list': 'إظهار القائمة',
+                'episodes': 'حلقات المسلسل',
+                'back_series': '🔙 رجوع للمسلسلات',
+              },
+              'fr': {
+                'ready': 'Prêt',
+                'loading': 'Chargement des chaînes & VOD...',
+                'loaded': 'Chargé avec succès !',
+                'error': 'Erreur de connexion au serveur',
+                'live': '📺 Direct',
+                'movies': '🎬 Films',
+                'series': '🍿 Séries',
+                'fav': '⭐ Favoris',
+                'recent': '🕒 Récents',
+                'all': 'Tout',
+                'search': '🔍 Recherche rapide...',
+                'server': '🔑 Serveur',
+                'playing': 'En cours :',
+                'choose': 'Sélectionnez une chaîne ou un film',
+                'reconnecting': '⚡ Reconnexion Anti-Freeze...',
+                'server_title': 'Paramètres Serveur - DINO ALLACH PRO',
+                'connect_xtream': 'Connexion Xtream Codes',
+                'or_m3u': 'Ou lien M3U direct',
+                'load_m3u': 'Charger M3U',
+                'hide_list': 'Mode Cinéma',
+                'show_list': 'Afficher Liste',
+                'episodes': 'Épisodes',
+                'back_series': '🔙 Retour aux Séries',
+              },
+              'en': {
+                'ready': 'Ready',
+                'loading': 'Loading Live, Movies & Series...',
+                'loaded': 'Loaded Successfully!',
+                'error': 'Server Connection Error',
+                'live': '📺 Live TV',
+                'movies': '🎬 Movies',
+                'series': '🍿 Series',
+                'fav': '⭐ Favorites',
+                'recent': '🕒 Recent',
+                'all': 'All',
+                'search': '🔍 Quick search...',
+                'server': '🔑 Server',
+                'playing': 'Now Playing:',
+                'choose': 'Select a channel or movie to play',
+                'reconnecting': '⚡ Auto-Reconnecting Stream...',
+                'server_title': 'Server Setup - DINO ALLACH PRO',
+                'connect_xtream': 'Login with Xtream Codes',
+                'or_m3u': 'Or Direct M3U URL',
+                'load_m3u': 'Load M3U Playlist',
+                'hide_list': 'Cinema Mode',
+                'show_list': 'Show Lists',
+                'episodes': 'Episodes',
+                'back_series': '🔙 Back to Series',
+              }
+            };
+
+            String tr(String key) => _i18n[_lang]?[key] ?? key;
+
+            Map<String, Map<String, List>>> _data = {
+              'live': {'ALL': []},
+              'movies': {'ALL': []},
+              'series': {'ALL': []},
+            };
+
+            List> _favorites = [];
+            List> _recents = [];
+            List> _currentChannels = [];
+            bool _insideSeriesEpisodes = false;
+
+            VideoPlayerController? _videoController;
+            ChewieController? _chewieController;
+            Map<String, String>? _activeChannel;
+            Timer? _watchdogTimer;
+
+            @override
+            void initState() {
+              super.initState();
+              _initApp();
+              _watchdogTimer = Timer.periodic(const Duration(seconds: 4), (_) => _checkStreamHealth());
+            }
+
+            Future<void> _initApp() async {
+              final prefs = await SharedPreferences.getInstance();
+              setState(() {
+                _lang = prefs.getString('lang') ?? 'ar';
+                _engineIdx = prefs.getInt('engine') ?? 0;
+                _hostCtrl.text = prefs.getString('host') ?? '';
+                _userCtrl.text = prefs.getString('user') ?? '';
+                _passCtrl.text = prefs.getString('pass') ?? '';
+                _m3uCtrl.text = prefs.getString('m3u') ?? '';
+                final favRaw = prefs.getString('favs');
+                if (favRaw != null) {
+                  _favorites = List>.from(
+                    (jsonDecode(favRaw) as List).map((e) => Map<String, String>.from(e)),
+                  );
+                }
+                final recRaw = prefs.getString('recents');
+                if (recRaw != null) {
+                  _recents = List>.from(
+                    (jsonDecode(recRaw) as List).map((e) => Map<String, String>.from(e)),
+                  );
+                }
+              });
+
+              if (_hostCtrl.text.isNotEmpty && _userCtrl.text.isNotEmpty) {
+                _loginXtream();
+              } else if (_m3uCtrl.text.isNotEmpty) {
+                _loadM3U();
+              }
+            }
+
+            void _checkStreamHealth() {
+              if (!_antiFreeze || _activeChannel == null || _videoController == null) return;
+              if (_currentTab == 'live' && _videoController!.value.isInitialized) {
+                if (_videoController!.value.hasError) {
+                  setState(() => _customStatus = tr('reconnecting'));
+                  _playChannel(_activeChannel!, isReconnect: true);
+                }
+              }
+            }
+
+            Future<void> _cycleLanguage() async {
+              final langs = ['ar', 'fr', 'en'];
+              final next = langs[(langs.indexOf(_lang) + 1) % langs.length];
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('lang', next);
+              setState(() => _lang = next);
+            }
+
+            Future<void> _toggleFavorite(Map<String, String> ch) async {
+              final prefs = await SharedPreferences.getInstance();
+              final exists = _favorites.any((x) => x['url'] == ch['url']);
+              setState(() {
+                if (exists) {
+                  _favorites.removeWhere((x) => x['url'] == ch['url']);
+                } else {
+                  _favorites.insert(0, ch);
+                }
+                if (_currentTab == 'fav') _currentChannels = List.from(_favorites);
+              });
+              await prefs.setString('favs', jsonEncode(_favorites));
+            }
+
+            bool _isFav(Map<String, String> ch) => _favorites.any((x) => x['url'] == ch['url']);
+
+            Future<void> _addToRecent(Map<String, String> ch) async {
+              final prefs = await SharedPreferences.getInstance();
+              _recents.removeWhere((x) => x['url'] == ch['url']);
+              _recents.insert(0, ch);
+              if (_recents.length > 60) _recents = _recents.sublist(0, 60);
+              await prefs.setString('recents', jsonEncode(_recents));
+            }
+
+            Future<void> _loginXtream() async {
+              String h = _hostCtrl.text.trim();
+              if (h.endsWith('/')) h = h.substring(0, h.length - 1);
+              String u = _userCtrl.text.trim();
+              String p = _passCtrl.text.trim();
+              if (h.isEmpty || u.isEmpty || p.isEmpty) return;
+
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('host', h);
+              await prefs.setString('user', u);
+              await prefs.setString('pass', p);
+
+              setState(() {
+                _statusKey = 'loading';
+                _customStatus = '';
+              });
+
+              final headers = {'User-Agent': _engines[_engineIdx]['ua']!};
+              Map<String, Map<String, List>>> temp = {
+                'live': {'ALL': []},
+                'movies': {'ALL': []},
+                'series': {'ALL': []},
+              };
+
+              try {
+                final lCatRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_live_categories'), headers: headers);
+                Map<String, String> lCats = {};
+                if (lCatRes.statusCode == 200) {
+                  for (var c in jsonDecode(lCatRes.body)) {
+                    lCats[c['category_id'].toString()] = c['category_name'].toString();
+                  }
+                }
+                final liveRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_live_streams'), headers: headers);
+                if (liveRes.statusCode == 200) {
+                  for (var st in jsonDecode(liveRes.body)) {
+                    String grp = lCats[st['category_id'].toString()] ?? 'Live TV';
+                    String sid = st['stream_id'].toString();
+                    var item = {
+                      'name': st['name'].toString(),
+                      'url': '$h/live/$u/$p/$sid.ts',
+                      'm3u8': '$h/live/$u/$p/$sid.m3u8',
+                      'group': grp
+                    };
+                    temp['live']!['ALL']!.add(item);
+                    temp['live']!.putIfAbsent(grp, () => []).add(item);
+                  }
+                }
+
+                final vCatRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_vod_categories'), headers: headers);
+                Map<String, String> vCats = {};
+                if (vCatRes.statusCode == 200) {
+                  for (var c in jsonDecode(vCatRes.body)) {
+                    vCats[c['category_id'].toString()] = c['category_name'].toString();
+                  }
+                }
+                final vodRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_vod_streams'), headers: headers);
+                if (vodRes.statusCode == 200) {
+                  for (var st in jsonDecode(vodRes.body)) {
+                    String grp = vCats[st['category_id'].toString()] ?? 'Movies';
+                    String sid = st['stream_id'].toString();
+                    String ext = (st['container_extension'] ?? 'mp4').toString();
+                    var item = {'name': st['name'].toString(), 'url': '$h/movie/$u/$p/$sid.$ext', 'group': grp};
+                    temp['movies']!['ALL']!.add(item);
+                    temp['movies']!.putIfAbsent(grp, () => []).add(item);
+                  }
+                }
+
+                final sCatRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_series_categories'), headers: headers);
+                Map<String, String> sCats = {};
+                if (sCatRes.statusCode == 200) {
+                  for (var c in jsonDecode(sCatRes.body)) {
+                    sCats[c['category_id'].toString()] = c['category_name'].toString();
+                  }
+                }
+                final serRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_series'), headers: headers);
+                if (serRes.statusCode == 200) {
+                  for (var st in jsonDecode(serRes.body)) {
+                    String grp = sCats[st['category_id'].toString()] ?? 'Series';
+                    String sid = st['series_id'].toString();
+                    var item = {'name': '🍿 ${st['name']}', 'url': 'series://$h|$u|$p|$sid', 'group': grp};
+                    temp['series']!['ALL']!.add(item);
+                    temp['series']!.putIfAbsent(grp, () => []).add(item);
+                  }
+                }
+
+                setState(() {
+                  _data = temp;
+                  _selectedCat = 'ALL';
+                  _insideSeriesEpisodes = false;
+                  if (_currentTab == 'fav') {
+                    _currentChannels = _favorites;
+                  } else if (_currentTab == 'recent') {
+                    _currentChannels = _recents;
+                  } else {
+                    _currentChannels = _data[_currentTab]!['ALL'] ?? [];
+                  }
+                  _statusKey = 'loaded';
+                });
+              } catch (e) {
+                setState(() => _statusKey = 'error');
+              }
+            }
+
+            Future<void> _loadM3U() async {
+              String url = _m3uCtrl.text.trim();
+              if (url.isEmpty) return;
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('m3u', url);
+              setState(() {
+                _statusKey = 'loading';
+                _customStatus = '';
+              });
+
+              try {
+                final res = await http.get(Uri.parse(url), headers: {'User-Agent': _engines[_engineIdx]['ua']!});
+                if (res.statusCode == 200) {
+                  Map<String, Map<String, List>>> temp = {
+                    'live': {'ALL': []},
+                    'movies': {'ALL': []},
+                    'series': {'ALL': []},
+                  };
+                  String curName = 'Channel';
+                  String curGrp = 'General';
+                  final grpReg = RegExp(r'group-title="([^"]*)"', caseSensitive: false);
+
+                  for (var raw in const LineSplitter().convert(res.body)) {
+                    String line = raw.trim();
+                    if (line.startsWith('#EXTINF')) {
+                      final m = grpReg.firstMatch(line);
+                      curGrp = (m != null && m.group(1)!.isNotEmpty) ? m.group(1)! : 'General';
+                      final parts = line.split(',');
+                      curName = parts.length > 1 ? parts.sublist(1).join(',').trim() : 'Stream';
+                    } else if (line.startsWith('http')) {
+                      String sec = 'live';
+                      if (line.contains('/movie/') || line.endsWith('.mp4') || line.endsWith('.mkv')) sec = 'movies';
+                      if (line.contains('/series/')) sec = 'series';
+                      var item = {'name': curName, 'url': line, 'group': curGrp};
+                      temp[sec]!['ALL']!.add(item);
+                      temp[sec]!.putIfAbsent(curGrp, () => []).add(item);
+                    }
+                  }
+                  setState(() {
+                    _data = temp;
+                    _selectedCat = 'ALL';
+                    _currentChannels = _data[_currentTab]?['ALL'] ?? [];
+                    _statusKey = 'loaded';
+                  });
+                }
+              } catch (e) {
+                setState(() => _statusKey = 'error');
+              }
+            }
+
+            double _getAspectRatio() {
+              if (_aspectIdx == 0) return 16 / 9;
+              if (_aspectIdx == 1) return 21 / 9;
+              if (_aspectIdx == 2) return 4 / 3;
+              if (_videoController != null && _videoController!.value.isInitialized) {
+                return _videoController!.value.aspectRatio;
+              }
+              return 16 / 9;
+            }
+
+            Future<void> _playChannel(Map<String, String> ch, {bool isReconnect = false, bool useFallbackM3u8 = false}) async {
+              String url = (useFallbackM3u8 && ch['m3u8'] != null) ? ch['m3u8']! : ch['url']!;
+              if (url.startsWith('series://')) {
+                _loadSeriesEpisodes(url);
+                return;
+              }
+
+              _activeChannel = ch;
+              if (!isReconnect) {
+                _addToRecent(ch);
+                setState(() => _customStatus = '');
+              }
+
+              await _videoController?.dispose();
+              _chewieController?.dispose();
+
+              _videoController = VideoPlayerController.networkUrl(
+                Uri.parse(url),
+                httpHeaders: {
+                  'User-Agent': _engines[_engineIdx]['ua']!,
+                  'Connection': 'keep-alive',
+                },
+              );
+
+              try {
+                await _videoController!.initialize();
+                _buildChewie();
+              } catch (e) {
+                if (!useFallbackM3u8 && ch['m3u8'] != null) {
+                  _playChannel(ch, isReconnect: true, useFallbackM3u8: true);
+                } else {
+                  setState(() => _customStatus = tr('reconnecting'));
+                }
+              }
+            }
+
+            void _buildChewie() {
+              if (_videoController == null || !_videoController!.value.isInitialized) return;
+              _chewieController?.dispose();
+              _chewieController = ChewieController(
+                videoPlayerController: _videoController!,
+                autoPlay: true,
+                isLive: _currentTab == 'live',
+                aspectRatio: _getAspectRatio(),
+                allowFullScreen: true,
+                overlay: IgnorePointer(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'dino allach',
+                          style: TextStyle(
+                            color: Color(0x88FFFFFF),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.4,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+              setState(() {});
+            }
+
+            Future<void> _loadSeriesEpisodes(String rawUrl) async {
+              final parts = rawUrl.replaceFirst('series://', '').split('|');
+              if (parts.length < 4) return;
+              String h = parts[0], u = parts[1], p = parts[2], sid = parts[3];
+              setState(() => _statusKey = 'loading');
+              try {
+                final res = await http.get(
+                  Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_series_info&series_id=$sid'),
+                  headers: {'User-Agent': _engines[_engineIdx]['ua']!},
+                );
+                if (res.statusCode == 200) {
+                  final decoded = jsonDecode(res.body);
+                  final epsMap = decoded['episodes'];
+                  List> epList = [];
+                  if (epsMap is Map) {
+                    epsMap.forEach((season, eps) {
+                      for (var ep in eps) {
+                        String id = ep['id'].toString();
+                        String ext = (ep['container_extension'] ?? 'mp4').toString();
+                        epList.add({
+                          'name': '▶ S$season - ${ep['title'] ?? 'Episode $id'}',
+                          'url': '$h/series/$u/$p/$id.$ext',
+                          'group': 'Season $season'
+                        });
+                      }
+                    });
+                  }
+                  setState(() {
+                    _insideSeriesEpisodes = true;
+                    _currentChannels = epList;
+                    _statusKey = 'loaded';
+                  });
+                }
+              } catch (_) {}
+            }
+
+            void _openLoginModal() {
+              showDialog(
+                context: context,
+                builder: (_) => Directionality(
+                  textDirection: _lang == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+                  child: AlertDialog(
+                    backgroundColor: const Color(0xFF121622),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: Color(0xFFF5C518), width: 1.2),
+                    ),
+                    title: Text(tr('server_title'), style: const TextStyle(color: Color(0xFFF5C518), fontWeight: FontWeight.bold, fontSize: 16)),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextField(controller: _hostCtrl, decoration: const InputDecoration(labelText: 'Host (http://server:8080)', prefixIcon: Icon(Icons.dns))),
+                          const SizedBox(height: 6),
+                          TextField(controller: _userCtrl, decoration: const InputDecoration(labelText: 'Username', prefixIcon: Icon(Icons.person))),
+                          const SizedBox(height: 6),
+                          TextField(controller: _passCtrl, obscureText: true, decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock))),
+                          const SizedBox(height: 14),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE50914), padding: const EdgeInsets.symmetric(vertical: 12)),
+                              onPressed: () { Navigator.pop(context); _loginXtream(); },
+                              icon: const Icon(Icons.bolt),
+                              label: Text(tr('connect_xtream'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          const Divider(height: 24, color: Colors.white24),
+                          TextField(controller: _m3uCtrl, decoration: InputDecoration(labelText: tr('or_m3u'), prefixIcon: const Icon(Icons.link))),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF23293E), padding: const EdgeInsets.symmetric(vertical: 11)),
+                              onPressed: () { Navigator.pop(context); _loadM3U(); },
+                              icon: const Icon(Icons.playlist_play),
+                              label: Text(tr('load_m3u')),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            @override
+            void dispose() {
+              _watchdogTimer?.cancel();
+              _videoController?.dispose();
+              _chewieController?.dispose();
+              super.dispose();
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              final isRtl = _lang == 'ar';
+              final cats = (_currentTab == 'fav' || _currentTab == 'recent')
+                  ? ['ALL']
+                  : _data[_currentTab]!.keys.toList();
+
+              final q = _searchCtrl.text.trim().toLowerCase();
+              final filteredChannels = _currentChannels.where((c) =>
+                q.isEmpty || c['name']!.toLowerCase().contains(q)
+              ).toList();
+
+              return Directionality(
+                textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+                child: Scaffold(
+                  body: SafeArea(
+                    child: Column(
+                      children: [
+                        // الشريط العلوي الاحترافي
+                        Container(
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF111520),
+                            border: Border(bottom: BorderSide(color: Color(0xFFE50914), width: 2)),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE50914),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    '⚡ DINO ALLACH PRO',
+                                    style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                _tabBtn('live', '${tr('live')} (${_data['live']!['ALL']!.length})'),
+                                const SizedBox(width: 5),
+                                _tabBtn('movies', '${tr('movies')} (${_data['movies']!['ALL']!.length})'),
+                                const SizedBox(width: 5),
+                                _tabBtn('series', '${tr('series')} (${_data['series']!['ALL']!.length})'),
+                                const SizedBox(width: 5),
+                                _tabBtn('fav', '${tr('fav')} (${_favorites.length})'),
+                                const SizedBox(width: 5),
+                                _tabBtn('recent', '${tr('recent')} (${_recents.length})'),
+                                const SizedBox(width: 10),
+                                // اختيار المحرك
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1B2030),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: Colors.white24),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<int>(
+                                      value: _engineIdx,
+                                      dropdownColor: const Color(0xFF161A28),
+                                      style: const TextStyle(color: Color(0xFFF5C518), fontSize: 11, fontWeight: FontWeight.bold),
+                                      items: List.generate(_engines.length, (idx) => DropdownMenuItem(
+                                        value: idx,
+                                        child: Text('⚙️ ${_engines[idx]['name']}'),
+                                      )),
+                                      onChanged: (v) async {
+                                        if (v == null) return;
+                                        final prefs = await SharedPreferences.getInstance();
+                                        await prefs.setInt('engine', v);
+                                        setState(() => _engineIdx = v);
+                                        if (_activeChannel != null) _playChannel(_activeChannel!, isReconnect: true);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                // زر تغيير اللغة
+                                OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFF5C518),
+                                    side: const BorderSide(color: Color(0xFFF5C518)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  ),
+                                  onPressed: _cycleLanguage,
+                                  icon: const Icon(Icons.language, size: 15),
+                                  label: Text(_lang.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                ),
+                                const SizedBox(width: 6),
+                                // زر السيرفر
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFE50914),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  ),
+                                  onPressed: _openLoginModal,
+                                  child: Text(tr('server'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        // القسم الرئيسي
+                        Expanded(
+                          child: Row(
+                            children: [
+                              if (_showSidebar) ...[
+                                // عمود الباقات
+                                if (_currentTab != 'fav' && _currentTab != 'recent')
+                                  Container(
+                                    width: 145,
+                                    color: const Color(0xFF10131D),
+                                    child: ListView.builder(
+                                      itemCount: cats.length,
+                                      itemBuilder: (_, i) {
+                                        String c = cats[i];
+                                        String label = c == 'ALL' ? tr('all') : c;
+                                        int count = _data[_currentTab]![c]?.length ?? 0;
+                                        bool sel = c == _selectedCat;
+                                        return InkWell(
+                                          onTap: () {
+                                            setState(() {
+                                              _selectedCat = c;
+                                              _insideSeriesEpisodes = false;
+                                              _currentChannels = _data[_currentTab]![c] ?? [];
+                                            });
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                                            decoration: BoxDecoration(
+                                              color: sel ? const Color(0xFFE50914) : Colors.transparent,
+                                              border: Border(
+                                                bottom: const BorderSide(color: Color(0xFF1B2030), width: 0.8),
+                                                right: sel && isRtl ? const BorderSide(color: Color(0xFFF5C518), width: 4) : BorderSide.none,
+                                                left: sel && !isRtl ? const BorderSide(color: Color(0xFFF5C518), width: 4) : BorderSide.none,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              '$label ($count)',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                                                color: sel ? Colors.white : Colors.white70,
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                // عمود القنوات والبحث
+                                Container(
+                                  width: 215,
+                                  color: const Color(0xFF151926),
+                                  child: Column(
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.all(6.0),
+                                        child: TextField(
+                                          controller: _searchCtrl,
+                                          onChanged: (_) => setState(() {}),
+                                          style: const TextStyle(fontSize: 12),
+                                          decoration: InputDecoration(
+                                            hintText: tr('search'),
+                                            isDense: true,
+                                            filled: true,
+                                            fillColor: const Color(0xFF0E111A),
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                                            suffixIcon: _searchCtrl.text.isNotEmpty
+                                                ? IconButton(
+                                                    icon: const Icon(Icons.clear, size: 15),
+                                                    onPressed: () { _searchCtrl.clear(); setState(() {}); },
+                                                  )
+                                                : null,
+                                          ),
+                                        ),
+                                      ),
+                                      if (_insideSeriesEpisodes)
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          child: SizedBox(
+                                            width: double.infinity,
+                                            child: ElevatedButton(
+                                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF262D45)),
+                                              onPressed: () {
+                                                setState(() {
+                                                  _insideSeriesEpisodes = false;
+                                                  _currentChannels = _data['series']![_selectedCat] ?? [];
+                                                });
+                                              },
+                                              child: Text(tr('back_series'), style: const TextStyle(fontSize: 11)),
+                                            ),
+                                          ),
+                                        ),
+                                      Expanded(
+                                        child: ListView.builder(
+                                          itemCount: filteredChannels.length,
+                                          itemBuilder: (_, i) {
+                                            final ch = filteredChannels[i];
+                                            final isPlaying = _activeChannel != null && _activeChannel!['url'] == ch['url'];
+                                            final fav = _isFav(ch);
+                                            return InkWell(
+                                              onTap: () => _playChannel(ch),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                decoration: BoxDecoration(
+                                                  color: isPlaying ? const Color(0xFF28151B) : Colors.transparent,
+                                                  border: const Border(bottom: BorderSide(color: Color(0xFF1D2233), width: 0.7)),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        '${i + 1}. ${ch['name']}',
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: isPlaying ? const Color(0xFFF5C518) : Colors.white,
+                                                          fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    GestureDetector(
+                                                      onTap: () => _toggleFavorite(ch),
+                                                      child: Padding(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                                                        child: Icon(
+                                                          fav ? Icons.star : Icons.star_border,
+                                                          size: 17,
+                                                          color: fav ? const Color(0xFFF5C518) : Colors.white38,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              // شاشة المشغل (ExoPlayer) + شريط التحكم السفلي
+                              Expanded(
+                                child: Container(
+                                  color: Colors.black,
+                                  child: Column(
+                                    children: [
+                                      Expanded(
+                                        child: Stack(
+                                          children: [
+                                            Center(
+                                              child: _chewieController != null && _videoController!.value.isInitialized
+                                                  ? Chewie(controller: _chewieController!)
+                                                  : Column(
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      children: [
+                                                        const Icon(Icons.live_tv_rounded, size: 58, color: Color(0xFFE50914)),
+                                                        const SizedBox(height: 10),
+                                                        const Text(
+                                                          'DINO ALLACH PRO',
+                                                          style: TextStyle(color: Color(0xFFF5C518), fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.5),
+                                                        ),
+                                                        const SizedBox(height: 4),
+                                                        Text(
+                                                          '${_engines[_engineIdx]['name']} • Anti-Freeze Streamer',
+                                                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                                        ),
+                                                      ],
+                                                    ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      // الشريط السفلي الذكي للتحكم السريع
+                                      Container(
+                                        color: const Color(0xFF111520),
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        child: Row(
+                                          children: [
+                                            InkWell(
+                                              onTap: () => setState(() => _showSidebar = !_showSidebar),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF1F2538),
+                                                  borderRadius: BorderRadius.circular(5),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(_showSidebar ? Icons.fullscreen : Icons.view_sidebar, size: 15, color: const Color(0xFFF5C518)),
+                                                    const SizedBox(width: 4),
+                                                    Text(_showSidebar ? tr('hide_list') : tr('show_list'), style: const TextStyle(fontSize: 11)),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                _activeChannel != null
+                                                    ? '[${_engines[_engineIdx]['name']!.split(' ')[0]}] ${tr('playing')} ${_activeChannel!['name']}'
+                                                    : (_customStatus.isNotEmpty ? _customStatus : tr(_statusKey)),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(color: Color(0xFFF5C518), fontSize: 12, fontWeight: FontWeight.bold),
+                                              ),
+                                            ),
+                                            // زر Anti-Freeze
+                                            InkWell(
+                                              onTap: () => setState(() => _antiFreeze = !_antiFreeze),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: _antiFreeze ? const Color(0xFF143824) : const Color(0xFF252A3A),
+                                                  borderRadius: BorderRadius.circular(5),
+                                                ),
+                                                child: Text(
+                                                  _antiFreeze ? '🛡️ Anti-Freeze: ON' : '🛡️ Anti-Freeze: OFF',
+                                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _antiFreeze ? Colors.greenAccent : Colors.white54),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            // زر تغيير الأبعاد Aspect Ratio
+                                            InkWell(
+                                              onTap: () {
+                                                setState(() => _aspectIdx = (_aspectIdx + 1) % _aspectNames.length);
+                                                _buildChewie();
+                                              },
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF1F2538),
+                                                  borderRadius: BorderRadius.circular(5),
+                                                ),
+                                                child: Text(
+                                                  '📐 ${_aspectNames[_aspectIdx]}',
+                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            // زر إعادة التحميل الفوري للبث
+                                            if (_activeChannel != null)
+                                              InkWell(
+                                                onTap: () => _playChannel(_activeChannel!, isReconnect: true),
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFE50914),
+                                                    borderRadius: BorderRadius.circular(5),
+                                                  ),
+                                                  child: const Icon(Icons.refresh, size: 15, color: Colors.white),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            Widget _tabBtn(String key, String label) {
+              bool active = _currentTab == key;
+              return ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: active ? const Color(0xFFF5C518) : const Color(0xFF1B2032),
+                  foregroundColor: active ? Colors.black : Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  minimumSize: Size.zero,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _currentTab = key;
+                    _insideSeriesEpisodes = false;
+                    if (key == 'fav') {
+                      _currentChannels = List.from(_favorites);
+                    } else if (key == 'recent') {
+                      _currentChannels = List.from(_recents);
+                    } else {
+                      _selectedCat = 'ALL';
+                      _currentChannels = _data[key]!['ALL'] ?? [];
+                    }
+                  });
+                },
+                child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
+              );
+            }
+          }
+          '''
+          with open("lib/main.dart", "w", encoding="utf-8") as f:
+              f.write(code.strip())
+          PYEOF
+
           flutter build apk --release --no-tree-shake-icons
           cp build/app/outputs/flutter-apk/app-release.apk /tmp/dino_allach.apk
 
