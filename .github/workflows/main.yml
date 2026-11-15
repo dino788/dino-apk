@@ -26,9 +26,9 @@ jobs:
           mkdir -p /tmp/dino_vip
           cd /tmp/dino_vip
           flutter create --org com.dinoallach --project-name dino_allach_tv --platforms android .
-          flutter pub add http shared_preferences video_player chewie
+          flutter pub add http shared_preferences video_player chewie wakelock_plus
           rm -rf test
-          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.WAKE_LOCK"\/>\n    <application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="[^"]*"/android:label="dino allach"/g' android/app/src/main/AndroidManifest.xml
           sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "2.1.0"/g' android/settings.gradle
 
@@ -43,10 +43,12 @@ jobs:
           import 'package:shared_preferences/shared_preferences.dart';
           import 'package:video_player/video_player.dart';
           import 'package:chewie/chewie.dart';
+          import 'package:wakelock_plus/wakelock_plus.dart';
 
           void main() {
             WidgetsFlutterBinding.ensureInitialized();
             SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+            WakelockPlus.enable();
             runApp(const DinoAllachVIP());
           }
 
@@ -194,6 +196,7 @@ jobs:
             @override
             void initState() {
               super.initState();
+              WakelockPlus.enable();
               _initApp();
               _watchdogTimer = Timer.periodic(const Duration(seconds: 4), (_) => _checkStreamHealth());
             }
@@ -225,6 +228,7 @@ jobs:
             }
 
             void _checkStreamHealth() {
+              WakelockPlus.enable();
               if (!_antiFreeze || _activeChannel == null || _videoController == null) return;
               if (_currentTab == 'live' && _videoController!.value.isInitialized) {
                 if (_videoController!.value.hasError) {
@@ -437,6 +441,7 @@ jobs:
             }
 
             Future _playChannel(Map ch, {bool isReconnect = false, bool useFallbackM3u8 = false}) async {
+              WakelockPlus.enable();
               String url = (useFallbackM3u8 && ch['m3u8'] != null) ? ch['m3u8'].toString() : ch['url'].toString();
               if (url.startsWith('series://')) {
                 _loadSeriesEpisodes(url);
@@ -475,6 +480,7 @@ jobs:
 
             void _buildChewie() {
               if (_videoController == null || !_videoController!.value.isInitialized) return;
+              WakelockPlus.enable();
               _chewieController?.dispose();
               _chewieController = ChewieController(
                 videoPlayerController: _videoController!,
@@ -482,6 +488,7 @@ jobs:
                 isLive: _currentTab == 'live',
                 aspectRatio: _getAspectRatio(),
                 allowFullScreen: true,
+                allowedScreenSleep: false,
                 overlay: IgnorePointer(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
