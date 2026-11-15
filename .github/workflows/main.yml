@@ -15,10 +15,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Flutter
+      - name: Setup Flutter 3.27.4
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.22.3'
+          flutter-version: '3.27.4'
           channel: 'stable'
 
       - name: Create & Inject Dino Allach VIP App
@@ -32,7 +32,9 @@ jobs:
           sed -i 's/android:label="[^"]*"/android:label="dino allach"/g' android/app/src/main/AndroidManifest.xml
 
           python3 - << 'PYEOF'
-          code = r'''import 'dart:async';
+          import textwrap
+          code = textwrap.dedent('''
+          import 'dart:async';
           import 'dart:convert';
           import 'package:flutter/material.dart';
           import 'package:flutter/services.dart';
@@ -76,13 +78,13 @@ jobs:
             final TextEditingController _m3uCtrl = TextEditingController();
             final TextEditingController _searchCtrl = TextEditingController();
 
-            String _lang = 'ar'; // ar, fr, en
-            String _currentTab = 'live'; // live, movies, series, fav, recent
+            String _lang = 'ar';
+            String _currentTab = 'live';
             String _selectedCat = 'ALL';
             String _statusKey = 'ready';
             String _customStatus = '';
             int _engineIdx = 0;
-            int _aspectIdx = 0; // 0: 16:9, 1: Stretch, 2: 4:3, 3: Original
+            int _aspectIdx = 0;
             bool _showSidebar = true;
             bool _antiFreeze = true;
 
@@ -118,7 +120,6 @@ jobs:
                 'load_m3u': 'تحميل قائمة M3U',
                 'hide_list': 'إخفاء القائمة',
                 'show_list': 'إظهار القائمة',
-                'episodes': 'حلقات المسلسل',
                 'back_series': '🔙 رجوع للمسلسلات',
               },
               'fr': {
@@ -143,7 +144,6 @@ jobs:
                 'load_m3u': 'Charger M3U',
                 'hide_list': 'Mode Cinéma',
                 'show_list': 'Afficher Liste',
-                'episodes': 'Épisodes',
                 'back_series': '🔙 Retour aux Séries',
               },
               'en': {
@@ -168,7 +168,6 @@ jobs:
                 'load_m3u': 'Load M3U Playlist',
                 'hide_list': 'Cinema Mode',
                 'show_list': 'Show Lists',
-                'episodes': 'Episodes',
                 'back_series': '🔙 Back to Series',
               }
             };
@@ -349,7 +348,8 @@ jobs:
                   for (var st in jsonDecode(serRes.body)) {
                     String grp = sCats[st['category_id'].toString()] ?? 'Series';
                     String sid = st['series_id'].toString();
-                    var item = {'name': '🍿 ${st['name']}', 'url': 'series://$h|$u|$p|$sid', 'group': grp};
+                    String sName = st['name'].toString();
+                    var item = {'name': '🍿 $sName', 'url': 'series://$h|$u|$p|$sid', 'group': grp};
                     temp['series']!['ALL']!.add(item);
                     temp['series']!.putIfAbsent(grp, () => []).add(item);
                   }
@@ -525,8 +525,9 @@ jobs:
                       for (var ep in eps) {
                         String id = ep['id'].toString();
                         String ext = (ep['container_extension'] ?? 'mp4').toString();
+                        String epTitle = (ep['title'] ?? 'Episode $id').toString();
                         epList.add({
-                          'name': '▶ S$season - ${ep['title'] ?? 'Episode $id'}',
+                          'name': '▶ S$season - $epTitle',
                           'url': '$h/series/$u/$p/$id.$ext',
                           'group': 'Season $season'
                         });
@@ -613,13 +614,20 @@ jobs:
                 q.isEmpty || c['name']!.toLowerCase().contains(q)
               ).toList();
 
+              final liveCount = _data['live']!['ALL']!.length;
+              final moviesCount = _data['movies']!['ALL']!.length;
+              final seriesCount = _data['series']!['ALL']!.length;
+              final favCount = _favorites.length;
+              final recCount = _recents.length;
+              final engShort = _engines[_engineIdx]['name']!.split(' ')[0];
+              final activeName = _activeChannel != null ? _activeChannel!['name']! : '';
+
               return Directionality(
                 textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
                 child: Scaffold(
                   body: SafeArea(
                     child: Column(
                       children: [
-                        // الشريط العلوي الاحترافي
                         Container(
                           decoration: const BoxDecoration(
                             color: Color(0xFF111520),
@@ -642,17 +650,16 @@ jobs:
                                   ),
                                 ),
                                 const SizedBox(width: 8),
-                                _tabBtn('live', '${tr('live')} (${_data['live']!['ALL']!.length})'),
+                                _tabBtn('live', '${tr("live")} ($liveCount)'),
                                 const SizedBox(width: 5),
-                                _tabBtn('movies', '${tr('movies')} (${_data['movies']!['ALL']!.length})'),
+                                _tabBtn('movies', '${tr("movies")} ($moviesCount)'),
                                 const SizedBox(width: 5),
-                                _tabBtn('series', '${tr('series')} (${_data['series']!['ALL']!.length})'),
+                                _tabBtn('series', '${tr("series")} ($seriesCount)'),
                                 const SizedBox(width: 5),
-                                _tabBtn('fav', '${tr('fav')} (${_favorites.length})'),
+                                _tabBtn('fav', '${tr("fav")} ($favCount)'),
                                 const SizedBox(width: 5),
-                                _tabBtn('recent', '${tr('recent')} (${_recents.length})'),
+                                _tabBtn('recent', '${tr("recent")} ($recCount)'),
                                 const SizedBox(width: 10),
-                                // اختيار المحرك
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8),
                                   decoration: BoxDecoration(
@@ -667,7 +674,7 @@ jobs:
                                       style: const TextStyle(color: Color(0xFFF5C518), fontSize: 11, fontWeight: FontWeight.bold),
                                       items: List.generate(_engines.length, (idx) => DropdownMenuItem(
                                         value: idx,
-                                        child: Text('⚙️ ${_engines[idx]['name']}'),
+                                        child: Text('⚙️ ${_engines[idx]["name"]}'),
                                       )),
                                       onChanged: (v) async {
                                         if (v == null) return;
@@ -680,7 +687,6 @@ jobs:
                                   ),
                                 ),
                                 const SizedBox(width: 6),
-                                // زر تغيير اللغة
                                 OutlinedButton.icon(
                                   style: OutlinedButton.styleFrom(
                                     foregroundColor: const Color(0xFFF5C518),
@@ -692,7 +698,6 @@ jobs:
                                   label: Text(_lang.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11)),
                                 ),
                                 const SizedBox(width: 6),
-                                // زر السيرفر
                                 ElevatedButton(
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFFE50914),
@@ -705,12 +710,10 @@ jobs:
                             ),
                           ),
                         ),
-                        // القسم الرئيسي
                         Expanded(
                           child: Row(
                             children: [
                               if (_showSidebar) ...[
-                                // عمود الباقات
                                 if (_currentTab != 'fav' && _currentTab != 'recent')
                                   Container(
                                     width: 145,
@@ -755,7 +758,6 @@ jobs:
                                       },
                                     ),
                                   ),
-                                // عمود القنوات والبحث
                                 Container(
                                   width: 215,
                                   color: const Color(0xFF151926),
@@ -807,6 +809,7 @@ jobs:
                                             final ch = filteredChannels[i];
                                             final isPlaying = _activeChannel != null && _activeChannel!['url'] == ch['url'];
                                             final fav = _isFav(ch);
+                                            final chName = ch['name'] ?? '';
                                             return InkWell(
                                               onTap: () => _playChannel(ch),
                                               child: Container(
@@ -819,7 +822,7 @@ jobs:
                                                   children: [
                                                     Expanded(
                                                       child: Text(
-                                                        '${i + 1}. ${ch['name']}',
+                                                        '${i + 1}. $chName',
                                                         maxLines: 1,
                                                         overflow: TextOverflow.ellipsis,
                                                         style: TextStyle(
@@ -851,39 +854,33 @@ jobs:
                                   ),
                                 ),
                               ],
-                              // شاشة المشغل (ExoPlayer) + شريط التحكم السفلي
                               Expanded(
                                 child: Container(
                                   color: Colors.black,
                                   child: Column(
                                     children: [
                                       Expanded(
-                                        child: Stack(
-                                          children: [
-                                            Center(
-                                              child: _chewieController != null && _videoController!.value.isInitialized
-                                                  ? Chewie(controller: _chewieController!)
-                                                  : Column(
-                                                      mainAxisAlignment: MainAxisAlignment.center,
-                                                      children: [
-                                                        const Icon(Icons.live_tv_rounded, size: 58, color: Color(0xFFE50914)),
-                                                        const SizedBox(height: 10),
-                                                        const Text(
-                                                          'DINO ALLACH PRO',
-                                                          style: TextStyle(color: Color(0xFFF5C518), fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.5),
-                                                        ),
-                                                        const SizedBox(height: 4),
-                                                        Text(
-                                                          '${_engines[_engineIdx]['name']} • Anti-Freeze Streamer',
-                                                          style: const TextStyle(color: Colors.white54, fontSize: 12),
-                                                        ),
-                                                      ],
+                                        child: Center(
+                                          child: _chewieController != null && _videoController!.value.isInitialized
+                                              ? Chewie(controller: _chewieController!)
+                                              : Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    const Icon(Icons.live_tv_rounded, size: 58, color: Color(0xFFE50914)),
+                                                    const SizedBox(height: 10),
+                                                    const Text(
+                                                      'DINO ALLACH PRO',
+                                                      style: TextStyle(color: Color(0xFFF5C518), fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.5),
                                                     ),
-                                            ),
-                                          ],
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      '${_engines[_engineIdx]["name"]} • Anti-Freeze Streamer',
+                                                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                                    ),
+                                                  ],
+                                                ),
                                         ),
                                       ),
-                                      // الشريط السفلي الذكي للتحكم السريع
                                       Container(
                                         color: const Color(0xFF111520),
                                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -910,14 +907,13 @@ jobs:
                                             Expanded(
                                               child: Text(
                                                 _activeChannel != null
-                                                    ? '[${_engines[_engineIdx]['name']!.split(' ')[0]}] ${tr('playing')} ${_activeChannel!['name']}'
+                                                    ? '[$engShort] ${tr("playing")} $activeName'
                                                     : (_customStatus.isNotEmpty ? _customStatus : tr(_statusKey)),
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: const TextStyle(color: Color(0xFFF5C518), fontSize: 12, fontWeight: FontWeight.bold),
                                               ),
                                             ),
-                                            // زر Anti-Freeze
                                             InkWell(
                                               onTap: () => setState(() => _antiFreeze = !_antiFreeze),
                                               child: Container(
@@ -933,7 +929,6 @@ jobs:
                                               ),
                                             ),
                                             const SizedBox(width: 6),
-                                            // زر تغيير الأبعاد Aspect Ratio
                                             InkWell(
                                               onTap: () {
                                                 setState(() => _aspectIdx = (_aspectIdx + 1) % _aspectNames.length);
@@ -952,7 +947,6 @@ jobs:
                                               ),
                                             ),
                                             const SizedBox(width: 6),
-                                            // زر إعادة التحميل الفوري للبث
                                             if (_activeChannel != null)
                                               InkWell(
                                                 onTap: () => _playChannel(_activeChannel!, isReconnect: true),
@@ -1009,11 +1003,12 @@ jobs:
               );
             }
           }
-          '''
+          ''').strip()
           with open("lib/main.dart", "w", encoding="utf-8") as f:
-              f.write(code.strip())
+              f.write(code)
           PYEOF
 
+          flutter analyze --no-fatal-infos
           flutter build apk --release --no-tree-shake-icons
           cp build/app/outputs/flutter-apk/app-release.apk /tmp/dino_allach.apk
 
