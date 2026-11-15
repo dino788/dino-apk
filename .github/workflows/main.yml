@@ -118,9 +118,9 @@ jobs:
                 'playing': 'يشتغل الآن:',
                 'choose': 'اختر قناة أو فيلماً لبدء البث',
                 'reconnecting': '⚡ إعادة تثبيت البث تلقائياً...',
-                'server_title': 'إعدادات السيرفر - DINO ALLACH PRO',
+                'server_title': 'إعدادات السيرفر - كيبورد التلفاز الشامل',
                 'connect_xtream': 'اتصال بـ Xtream Codes',
-                'or_m3u': 'أو رابط M3U مباشر',
+                'or_m3u': 'رابط M3U مباشر',
                 'load_m3u': 'تحميل قائمة M3U',
                 'hide_list': 'وضع السينما',
                 'show_list': 'إظهار القائمة',
@@ -142,9 +142,9 @@ jobs:
                 'playing': 'En cours :',
                 'choose': 'Sélectionnez une chaîne ou un film',
                 'reconnecting': '⚡ Reconnexion Anti-Freeze...',
-                'server_title': 'Paramètres Serveur - DINO ALLACH PRO',
+                'server_title': 'Serveur - Clavier TV Complet',
                 'connect_xtream': 'Connexion Xtream Codes',
-                'or_m3u': 'Ou lien M3U direct',
+                'or_m3u': 'Lien M3U direct',
                 'load_m3u': 'Charger M3U',
                 'hide_list': 'Mode Cinéma',
                 'show_list': 'Afficher Liste',
@@ -166,9 +166,9 @@ jobs:
                 'playing': 'Now Playing:',
                 'choose': 'Select a channel or movie to play',
                 'reconnecting': '⚡ Auto-Reconnecting Stream...',
-                'server_title': 'Server Setup - DINO ALLACH PRO',
+                'server_title': 'Server Setup - Full TV Keyboard',
                 'connect_xtream': 'Login with Xtream Codes',
-                'or_m3u': 'Or Direct M3U URL',
+                'or_m3u': 'Direct M3U URL',
                 'load_m3u': 'Load M3U Playlist',
                 'hide_list': 'Cinema Mode',
                 'show_list': 'Show Lists',
@@ -564,110 +564,240 @@ jobs:
               } catch (_) {}
             }
 
-            Widget _tvTextField({
-              required TextEditingController controller,
-              required String label,
-              required IconData icon,
-              bool obscure = false,
-            }) {
-              return Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      obscureText: obscure,
-                      textInputAction: TextInputAction.next,
-                      style: const TextStyle(color: Colors.white, fontSize: 13),
-                      decoration: InputDecoration(
-                        labelText: label,
-                        labelStyle: const TextStyle(color: Colors.white70, fontSize: 12),
-                        prefixIcon: Icon(icon, color: const Color(0xFFF5C518), size: 18),
-                        filled: true,
-                        fillColor: const Color(0xFF1A1F30),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Colors.white24, width: 1),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: const BorderSide(color: Color(0xFFF5C518), width: 2.5),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  _tvButton(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-                    bgColor: const Color(0xFF23293E),
-                    onTap: () async {
-                      final data = await Clipboard.getData(Clipboard.kTextPlain);
-                      if (data != null && data.text != null) {
-                        controller.text = data.text!.trim();
-                      }
-                    },
-                    child: const Icon(Icons.content_paste, size: 16, color: Color(0xFFF5C518)),
-                  ),
-                ],
-              );
-            }
-
+            // نافذة السيرفر مع كلافيي شامل (جميع الأرقام + الحروف + الإشارات والرموز)
             void _openLoginModal() {
+              int activeField = 0; // 0: Host, 1: User, 2: Pass, 3: M3U
+              bool isUpper = false;
+              bool showExtraSymbols = false;
+              final List ctrls = [_hostCtrl, _userCtrl, _passCtrl, _m3uCtrl];
+              final List fieldNames = ['Host (http://...)', 'Username', 'Password', tr('or_m3u')];
+
+              final List numbersAndBasic = ['1','2','3','4','5','6','7','8','9','0',':','/','.','-','_','?','&','=','@'];
+              final List rowLetters1 = ['a','b','c','d','e','f','g','h','i','j','k','l','m'];
+              final List rowLetters2 = ['n','o','p','q','r','s','t','u','v','w','x','y','z'];
+              final List extraSymbols = ['#','%','+','~','!','*','\$',',',';','(',')','[',']','|','\\','^'];
+              final List shortcuts = ['http://', 'https://', ':8080', ':80', ':8880', ':25461', '.com', '.net', '.org', '.tv', '.me', '/get.php?', 'username=', '&password='];
+
               showDialog(
                 context: context,
-                builder: (_) => Directionality(
-                  textDirection: _lang == 'ar' ? TextDirection.rtl : TextDirection.ltr,
-                  child: AlertDialog(
-                    backgroundColor: const Color(0xFF121622),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: Color(0xFFF5C518), width: 1.5),
-                    ),
-                    title: Text(tr('server_title'), style: const TextStyle(color: Color(0xFFF5C518), fontWeight: FontWeight.bold, fontSize: 15)),
-                    content: SizedBox(
-                      width: 380,
-                      child: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _tvTextField(controller: _hostCtrl, label: 'Host (http://server:8080)', icon: Icons.dns),
-                            const SizedBox(height: 8),
-                            _tvTextField(controller: _userCtrl, label: 'Username', icon: Icons.person),
-                            const SizedBox(height: 8),
-                            _tvTextField(controller: _passCtrl, label: 'Password', icon: Icons.lock, obscure: true),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              child: _tvButton(
-                                bgColor: const Color(0xFFE50914),
-                                padding: const EdgeInsets.symmetric(vertical: 11),
-                                onTap: () { Navigator.pop(context); _loginXtream(); },
-                                child: Center(
-                                  child: Text('⚡ ${tr("connect_xtream")}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                ),
+                builder: (dialogCtx) {
+                  return StatefulBuilder(
+                    builder: (ctx, setModalState) {
+                      TextEditingController curCtrl = ctrls[activeField] as TextEditingController;
+
+                      void addText(String txt) {
+                        curCtrl.text = curCtrl.text + txt;
+                        setModalState(() {});
+                      }
+
+                      void backspace() {
+                        if (curCtrl.text.isNotEmpty) {
+                          curCtrl.text = curCtrl.text.substring(0, curCtrl.text.length - 1);
+                          setModalState(() {});
+                        }
+                      }
+
+                      Widget keyBtn(String label, VoidCallback onTap, {Color bg = const Color(0xFF1E2436), Color fg = Colors.white, double hPad = 9}) {
+                        return Padding(
+                          padding: const EdgeInsets.all(2.0),
+                          child: _tvButton(
+                            bgColor: bg,
+                            padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 6),
+                            onTap: onTap,
+                            child: Text(label, style: TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                        );
+                      }
+
+                      return Directionality(
+                        textDirection: _lang == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+                        child: Dialog(
+                          backgroundColor: const Color(0xFF0E121C),
+                          insetPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(color: Color(0xFFF5C518), width: 1.5),
+                          ),
+                          child: Container(
+                            width: 760,
+                            padding: const EdgeInsets.all(10),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // العنوان + أزرار الاتصال السريع
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(tr('server_title'), style: const TextStyle(color: Color(0xFFF5C518), fontWeight: FontWeight.bold, fontSize: 13)),
+                                      Row(
+                                        children: [
+                                          _tvButton(
+                                            bgColor: const Color(0xFFE50914),
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            onTap: () { Navigator.pop(dialogCtx); _loginXtream(); },
+                                            child: Text('⚡ ${tr("connect_xtream")}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          _tvButton(
+                                            bgColor: const Color(0xFF23293E),
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                            onTap: () { Navigator.pop(dialogCtx); _loadM3U(); },
+                                            child: Text('📂 ${tr("load_m3u")}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          _tvButton(
+                                            bgColor: const Color(0xFF33394B),
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                            onTap: () => Navigator.pop(dialogCtx),
+                                            child: const Text('✖', style: TextStyle(color: Colors.white, fontSize: 11)),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  // الخانات الأربع للاختيار بالتيليكوموند
+                                  Row(
+                                    children: List.generate(4, (idx) {
+                                      bool sel = activeField == idx;
+                                      String val = (ctrls[idx] as TextEditingController).text;
+                                      return Expanded(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                                          child: _tvButton(
+                                            autofocus: idx == 0,
+                                            isSelected: sel,
+                                            bgColor: const Color(0xFF171C2B),
+                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                            onTap: () => setModalState(() => activeField = idx),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  fieldNames[idx].toString(),
+                                                  maxLines: 1,
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: sel ? Colors.black87 : const Color(0xFFF5C518),
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  val.isEmpty ? '...' : val,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: sel ? Colors.black : Colors.white,
+                                                    fontWeight: FontWeight.w900,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  // شريط عرض النص الكامل للخانة المختارة حاليا
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFFF5C518), width: 1.2),
+                                    ),
+                                    child: Directionality(
+                                      textDirection: TextDirection.ltr,
+                                      child: Row(
+                                        children: [
+                                          Text('${fieldNames[activeField]}: ', style: const TextStyle(color: Color(0xFFF5C518), fontSize: 12, fontWeight: FontWeight.bold)),
+                                          Expanded(
+                                            child: Text(
+                                              '${curCtrl.text}▋',
+                                              style: const TextStyle(color: Colors.greenAccent, fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 0.8),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  // الكلافيي المدمج الخاص بالتيليكوموند (LTR)
+                                  Directionality(
+                                    textDirection: TextDirection.ltr,
+                                    child: Column(
+                                      children: [
+                                        // اختصارات الروابط والبورتات السريعة
+                                        Wrap(
+                                          alignment: WrapAlignment.center,
+                                          children: shortcuts.map((s) => keyBtn(s.toString(), () => addText(s.toString()), bg: const Color(0xFF232B42), fg: const Color(0xFFF5C518), hPad: 7)).toList(),
+                                        ),
+                                        // الصف الأول: جميع الأرقام 0-9 + الإشارات الأساسية (: / . - _ ? & = @)
+                                        Wrap(
+                                          alignment: WrapAlignment.center,
+                                          children: numbersAndBasic.map((c) => keyBtn(c.toString(), () => addText(c.toString()), bg: const Color(0xFF182238), fg: Colors.cyanAccent, hPad: 8)).toList(),
+                                        ),
+                                        if (showExtraSymbols)
+                                          // صف الرموز والإشارات الإضافية
+                                          Wrap(
+                                            alignment: WrapAlignment.center,
+                                            children: extraSymbols.map((c) => keyBtn(c.toString(), () => addText(c.toString()), bg: const Color(0xFF2C223E), fg: const Color(0xFFF5C518), hPad: 10)).toList(),
+                                          )
+                                        else ...[
+                                          // الصف الثاني: حروف a-m
+                                          Wrap(
+                                            alignment: WrapAlignment.center,
+                                            children: rowLetters1.map((c) {
+                                              String ch = isUpper ? c.toString().toUpperCase() : c.toString();
+                                              return keyBtn(ch, () => addText(ch));
+                                            }).toList(),
+                                          ),
+                                          // الصف الثالث: حروف n-z
+                                          Wrap(
+                                            alignment: WrapAlignment.center,
+                                            children: rowLetters2.map((c) {
+                                              String ch = isUpper ? c.toString().toUpperCase() : c.toString();
+                                              return keyBtn(ch, () => addText(ch));
+                                            }).toList(),
+                                          ),
+                                        ],
+                                        const SizedBox(height: 3),
+                                        // الصف الرابع: أزرار التحكم (حروف كبيرة، رموز إضافية، مسافة، مسح، لصق، الخانة التالية)
+                                        Wrap(
+                                          alignment: WrapAlignment.center,
+                                          children: [
+                                            keyBtn(isUpper ? '⬆️ ABC' : '⬇️ abc', () => setModalState(() => isUpper = !isUpper), bg: const Color(0xFF2C3552), fg: const Color(0xFFF5C518), hPad: 10),
+                                            keyBtn(showExtraSymbols ? '🔤 الحروف' : '#+= إشارات', () => setModalState(() => showExtraSymbols = !showExtraSymbols), bg: const Color(0xFF3B2854), fg: Colors.amberAccent, hPad: 10),
+                                            keyBtn('␣ Space', () => addText(' '), bg: const Color(0xFF263044), hPad: 12),
+                                            keyBtn('⌫ مسح حرف', backspace, bg: const Color(0xFF8B1E24), hPad: 12),
+                                            keyBtn('🗑️ مسح الكل', () => setModalState(() => curCtrl.clear()), bg: const Color(0xFF5A181C), hPad: 10),
+                                            keyBtn('📋 لصق', () async {
+                                              final data = await Clipboard.getData(Clipboard.kTextPlain);
+                                              if (data != null && data.text != null) {
+                                                curCtrl.text = data.text!.trim();
+                                                setModalState(() {});
+                                              }
+                                            }, bg: const Color(0xFF1F4E3D), hPad: 10),
+                                            keyBtn('⏭️ الخانة التالية', () => setModalState(() => activeField = (activeField + 1) % 4), bg: const Color(0xFF1C3B6E), fg: const Color(0xFFF5C518), hPad: 12),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const Divider(height: 22, color: Colors.white24),
-                            _tvTextField(controller: _m3uCtrl, label: tr('or_m3u'), icon: Icons.link),
-                            const SizedBox(height: 10),
-                            SizedBox(
-                              width: double.infinity,
-                              child: _tvButton(
-                                bgColor: const Color(0xFF23293E),
-                                padding: const EdgeInsets.symmetric(vertical: 11),
-                                onTap: () { Navigator.pop(context); _loadM3U(); },
-                                child: Center(
-                                  child: Text('📂 ${tr("load_m3u")}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                ),
+                      );
+                    },
+                  );
+                },
               );
             }
 
@@ -699,7 +829,7 @@ jobs:
                     return GestureDetector(
                       onTap: onTap,
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 120),
+                        duration: const Duration(milliseconds: 100),
                         padding: padding,
                         decoration: BoxDecoration(
                           color: focused
@@ -710,10 +840,10 @@ jobs:
                             color: focused
                                 ? const Color(0xFFF5C518)
                                 : (isSelected ? Colors.white : Colors.white12),
-                            width: focused ? 2.5 : 1.0,
+                            width: focused ? 2.2 : 1.0,
                           ),
                           boxShadow: focused
-                              ? [const BoxShadow(color: Color(0x88F5C518), blurRadius: 8, spreadRadius: 1)]
+                              ? [const BoxShadow(color: Color(0x88F5C518), blurRadius: 6, spreadRadius: 1)]
                               : null,
                         ),
                         child: child,
@@ -868,38 +998,9 @@ jobs:
                                   color: const Color(0xFF151926),
                                   child: Column(
                                     children: [
-                                      Padding(
-                                        padding: const EdgeInsets.all(6.0),
-                                        child: TextField(
-                                          controller: _searchCtrl,
-                                          onChanged: (_) => setState(() {}),
-                                          style: const TextStyle(fontSize: 12, color: Colors.white),
-                                          decoration: InputDecoration(
-                                            hintText: tr('search'),
-                                            isDense: true,
-                                            filled: true,
-                                            fillColor: const Color(0xFF0E111A),
-                                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                            enabledBorder: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(6),
-                                              borderSide: const BorderSide(color: Colors.white24),
-                                            ),
-                                            focusedBorder: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(6),
-                                              borderSide: const BorderSide(color: Color(0xFFF5C518), width: 2),
-                                            ),
-                                            suffixIcon: _searchCtrl.text.isNotEmpty
-                                                ? IconButton(
-                                                    icon: const Icon(Icons.clear, size: 15),
-                                                    onPressed: () { _searchCtrl.clear(); setState(() {}); },
-                                                  )
-                                                : null,
-                                          ),
-                                        ),
-                                      ),
                                       if (_insideSeriesEpisodes)
                                         Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                                           child: SizedBox(
                                             width: double.infinity,
                                             child: _tvButton(
@@ -985,7 +1086,7 @@ jobs:
                                                     ),
                                                     const SizedBox(height: 4),
                                                     Text(
-                                                      '${_engines[_engineIdx]["name"]} • Touch & Android TV Remote',
+                                                      '${_engines[_engineIdx]["name"]} • Full TV Keyboard + Symbols',
                                                       style: const TextStyle(color: Colors.white54, fontSize: 12),
                                                     ),
                                                   ],
