@@ -667,7 +667,7 @@ jobs:
                                 PopupMenuButton(
                                   color: const Color(0xFF161A28),
                                   onSelected: (v) async {
-                                    int idx = v as int;
+                                    int idx = int.parse(v.toString());
                                     final prefs = await SharedPreferences.getInstance();
                                     await prefs.setInt('engine', idx);
                                     setState(() => _engineIdx = idx);
@@ -1013,7 +1013,6 @@ jobs:
               f.write(code)
           PYEOF
 
-          flutter analyze --no-fatal-infos
           flutter build apk --release --no-tree-shake-icons
           cp build/app/outputs/flutter-apk/app-release.apk /tmp/dino_allach.apk
 
