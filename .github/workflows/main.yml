@@ -1,4 +1,3 @@
-
 name: Build Dino Allach VIP APK
 
 on:
@@ -625,7 +624,6 @@ jobs:
               );
             }
 
-            // زر متوافق 100% مع التيليكوموند واللمس مع إطار ذهبي واضح عند التحديد
             Widget _tvButton({
               required VoidCallback onTap,
               required Widget child,
@@ -635,40 +633,47 @@ jobs:
               bool isSelected = false,
               bool autofocus = false,
             }) {
-              return FocusableActionDetector(
+              return Focus(
                 autofocus: autofocus,
-                actions: {
-                  ActivateIntent: CallbackAction(onInvoke: (_) {
+                onKeyEvent: (node, event) {
+                  if (event is KeyDownEvent &&
+                      (event.logicalKey == LogicalKeyboardKey.select ||
+                       event.logicalKey == LogicalKeyboardKey.enter ||
+                       event.logicalKey == LogicalKeyboardKey.numpadEnter ||
+                       event.logicalKey == LogicalKeyboardKey.gameButtonA)) {
                     onTap();
-                    return null;
-                  }),
+                    return KeyEventResult.handled;
+                  }
+                  return KeyEventResult.ignored;
                 },
-                builder: (context, VoidCallback? _) {
-                  final bool focused = Focus.of(context).hasPrimaryFocus;
-                  return GestureDetector(
-                    onTap: onTap,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
-                      padding: padding,
-                      decoration: BoxDecoration(
-                        color: focused
-                            ? const Color(0xFFE50914)
-                            : (isSelected ? const Color(0xFFF5C518) : bgColor),
-                        borderRadius: BorderRadius.circular(radius),
-                        border: Border.all(
+                child: Builder(
+                  builder: (ctx) {
+                    final bool focused = Focus.of(ctx).hasPrimaryFocus;
+                    return GestureDetector(
+                      onTap: onTap,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        padding: padding,
+                        decoration: BoxDecoration(
                           color: focused
-                              ? const Color(0xFFF5C518)
-                              : (isSelected ? Colors.white : Colors.white12),
-                          width: focused ? 2.5 : 1.0,
+                              ? const Color(0xFFE50914)
+                              : (isSelected ? const Color(0xFFF5C518) : bgColor),
+                          borderRadius: BorderRadius.circular(radius),
+                          border: Border.all(
+                            color: focused
+                                ? const Color(0xFFF5C518)
+                                : (isSelected ? Colors.white : Colors.white12),
+                            width: focused ? 2.5 : 1.0,
+                          ),
+                          boxShadow: focused
+                              ? [const BoxShadow(color: Color(0x88F5C518), blurRadius: 8, spreadRadius: 1)]
+                              : null,
                         ),
-                        boxShadow: focused
-                            ? [const BoxShadow(color: Color(0x88F5C518), blurRadius: 8, spreadRadius: 1)]
-                            : null,
+                        child: child,
                       ),
-                      child: child,
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               );
             }
 
@@ -706,7 +711,6 @@ jobs:
                   body: SafeArea(
                     child: Column(
                       children: [
-                        // الشريط العلوي المتوافق مع التيليكوموند
                         Container(
                           decoration: const BoxDecoration(
                             color: Color(0xFF111520),
@@ -769,12 +773,10 @@ jobs:
                             ),
                           ),
                         ),
-                        // المحتوى الرئيسي
                         Expanded(
                           child: Row(
                             children: [
                               if (_showSidebar) ...[
-                                // قائمة الباقات بدعم كامل للتيليكوموند
                                 if (_currentTab != 'fav' && _currentTab != 'recent')
                                   Container(
                                     width: 150,
@@ -814,7 +816,6 @@ jobs:
                                       },
                                     ),
                                   ),
-                                // قائمة القنوات بدعم كامل لـ D-Pad و زر OK
                                 Container(
                                   width: 220,
                                   color: const Color(0xFF151926),
@@ -910,7 +911,6 @@ jobs:
                                   ),
                                 ),
                               ],
-                              // المشغل + شريط التحكم السفلي المتوافق مع التيليكوموند
                               Expanded(
                                 child: Container(
                                   color: Colors.black,
