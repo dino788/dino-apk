@@ -35,7 +35,7 @@ jobs:
 
           python3 - << 'PYEOF'
           import textwrap
-          code = textwrap.dedent('''
+          code = textwrap.dedent(r'''
           import 'dart:async';
           import 'dart:convert';
           import 'package:flutter/material.dart';
@@ -564,9 +564,8 @@ jobs:
               } catch (_) {}
             }
 
-            // نافذة السيرفر مع كلافيي شامل (جميع الأرقام + الحروف + الإشارات والرموز)
             void _openLoginModal() {
-              int activeField = 0; // 0: Host, 1: User, 2: Pass, 3: M3U
+              int activeField = 0;
               bool isUpper = false;
               bool showExtraSymbols = false;
               final List ctrls = [_hostCtrl, _userCtrl, _passCtrl, _m3uCtrl];
@@ -575,7 +574,7 @@ jobs:
               final List numbersAndBasic = ['1','2','3','4','5','6','7','8','9','0',':','/','.','-','_','?','&','=','@'];
               final List rowLetters1 = ['a','b','c','d','e','f','g','h','i','j','k','l','m'];
               final List rowLetters2 = ['n','o','p','q','r','s','t','u','v','w','x','y','z'];
-              final List extraSymbols = ['#','%','+','~','!','*','\$',',',';','(',')','[',']','|','\\','^'];
+              final List extraSymbols = ['#','%','+','~','!','*',',',';','(',')','[',']','|','^'];
               final List shortcuts = ['http://', 'https://', ':8080', ':80', ':8880', ':25461', '.com', '.net', '.org', '.tv', '.me', '/get.php?', 'username=', '&password='];
 
               showDialog(
@@ -625,7 +624,6 @@ jobs:
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  // العنوان + أزرار الاتصال السريع
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
@@ -657,7 +655,6 @@ jobs:
                                     ],
                                   ),
                                   const SizedBox(height: 6),
-                                  // الخانات الأربع للاختيار بالتيليكوموند
                                   Row(
                                     children: List.generate(4, (idx) {
                                       bool sel = activeField == idx;
@@ -702,7 +699,6 @@ jobs:
                                     }),
                                   ),
                                   const SizedBox(height: 6),
-                                  // شريط عرض النص الكامل للخانة المختارة حاليا
                                   Container(
                                     width: double.infinity,
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -727,29 +723,24 @@ jobs:
                                     ),
                                   ),
                                   const SizedBox(height: 6),
-                                  // الكلافيي المدمج الخاص بالتيليكوموند (LTR)
                                   Directionality(
                                     textDirection: TextDirection.ltr,
                                     child: Column(
                                       children: [
-                                        // اختصارات الروابط والبورتات السريعة
                                         Wrap(
                                           alignment: WrapAlignment.center,
                                           children: shortcuts.map((s) => keyBtn(s.toString(), () => addText(s.toString()), bg: const Color(0xFF232B42), fg: const Color(0xFFF5C518), hPad: 7)).toList(),
                                         ),
-                                        // الصف الأول: جميع الأرقام 0-9 + الإشارات الأساسية (: / . - _ ? & = @)
                                         Wrap(
                                           alignment: WrapAlignment.center,
                                           children: numbersAndBasic.map((c) => keyBtn(c.toString(), () => addText(c.toString()), bg: const Color(0xFF182238), fg: Colors.cyanAccent, hPad: 8)).toList(),
                                         ),
                                         if (showExtraSymbols)
-                                          // صف الرموز والإشارات الإضافية
                                           Wrap(
                                             alignment: WrapAlignment.center,
                                             children: extraSymbols.map((c) => keyBtn(c.toString(), () => addText(c.toString()), bg: const Color(0xFF2C223E), fg: const Color(0xFFF5C518), hPad: 10)).toList(),
                                           )
                                         else ...[
-                                          // الصف الثاني: حروف a-m
                                           Wrap(
                                             alignment: WrapAlignment.center,
                                             children: rowLetters1.map((c) {
@@ -757,7 +748,6 @@ jobs:
                                               return keyBtn(ch, () => addText(ch));
                                             }).toList(),
                                           ),
-                                          // الصف الثالث: حروف n-z
                                           Wrap(
                                             alignment: WrapAlignment.center,
                                             children: rowLetters2.map((c) {
@@ -767,7 +757,6 @@ jobs:
                                           ),
                                         ],
                                         const SizedBox(height: 3),
-                                        // الصف الرابع: أزرار التحكم (حروف كبيرة، رموز إضافية، مسافة، مسح، لصق، الخانة التالية)
                                         Wrap(
                                           alignment: WrapAlignment.center,
                                           children: [
