@@ -30,6 +30,7 @@ jobs:
           rm -rf test
           sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <application android:usesCleartextTraffic="true"/g' android/app/src/main/AndroidManifest.xml
           sed -i 's/android:label="[^"]*"/android:label="dino allach"/g' android/app/src/main/AndroidManifest.xml
+          sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "2.1.0"/g' android/settings.gradle
 
           python3 - << 'PYEOF'
           import textwrap
