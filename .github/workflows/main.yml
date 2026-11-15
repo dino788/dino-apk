@@ -68,10 +68,10 @@ jobs:
           class MainPlayerScreen extends StatefulWidget {
             const MainPlayerScreen({super.key});
             @override
-            State<MainPlayerScreen> createState() => _MainPlayerScreenState();
+            State createState() => _MainPlayerScreenState();
           }
 
-          class _MainPlayerScreenState extends State<MainPlayerScreen> {
+          class _MainPlayerScreenState extends State {
             final TextEditingController _hostCtrl = TextEditingController();
             final TextEditingController _userCtrl = TextEditingController();
             final TextEditingController _passCtrl = TextEditingController();
@@ -88,16 +88,16 @@ jobs:
             bool _showSidebar = true;
             bool _antiFreeze = true;
 
-            final List> _engines = [
+            final List _engines = [
               {'name': 'ExoPlayer Native (TV)', 'ua': 'ExoPlayerLib/2.19.1 (Linux; Android 13; TV)'},
               {'name': 'IBO Player Pro Engine', 'ua': 'IBOPlayer/3.8 (Android TV; Linux)'},
               {'name': 'IPTV Smarters Pro', 'ua': 'IPTVSmartersPlayer'},
               {'name': 'VLC / Lavf Anti-Freeze', 'ua': 'VLC/3.0.20 LibVLC/3.0.20'},
             ];
 
-            final List<String> _aspectNames = ['16:9', 'Stretch', '4:3', 'Auto'];
+            final List _aspectNames = ['16:9', 'Stretch', '4:3', 'Auto'];
 
-            final Map<String, Map<String, String>> _i18n = {
+            final Map _i18n = {
               'ar': {
                 'ready': 'جاهز للعمل',
                 'loading': 'جاري جلب القنوات والأفلام...',
@@ -172,22 +172,22 @@ jobs:
               }
             };
 
-            String tr(String key) => _i18n[_lang]?[key] ?? key;
+            String tr(String key) => (_i18n[_lang]?[key] ?? key).toString();
 
-            Map<String, Map<String, List>>> _data = {
+            Map _data = {
               'live': {'ALL': []},
               'movies': {'ALL': []},
               'series': {'ALL': []},
             };
 
-            List> _favorites = [];
-            List> _recents = [];
-            List> _currentChannels = [];
+            List _favorites = [];
+            List _recents = [];
+            List _currentChannels = [];
             bool _insideSeriesEpisodes = false;
 
             VideoPlayerController? _videoController;
             ChewieController? _chewieController;
-            Map<String, String>? _activeChannel;
+            Map? _activeChannel;
             Timer? _watchdogTimer;
 
             @override
@@ -197,7 +197,7 @@ jobs:
               _watchdogTimer = Timer.periodic(const Duration(seconds: 4), (_) => _checkStreamHealth());
             }
 
-            Future<void> _initApp() async {
+            Future _initApp() async {
               final prefs = await SharedPreferences.getInstance();
               setState(() {
                 _lang = prefs.getString('lang') ?? 'ar';
@@ -208,15 +208,11 @@ jobs:
                 _m3uCtrl.text = prefs.getString('m3u') ?? '';
                 final favRaw = prefs.getString('favs');
                 if (favRaw != null) {
-                  _favorites = List>.from(
-                    (jsonDecode(favRaw) as List).map((e) => Map<String, String>.from(e)),
-                  );
+                  _favorites = List.from(jsonDecode(favRaw));
                 }
                 final recRaw = prefs.getString('recents');
                 if (recRaw != null) {
-                  _recents = List>.from(
-                    (jsonDecode(recRaw) as List).map((e) => Map<String, String>.from(e)),
-                  );
+                  _recents = List.from(jsonDecode(recRaw));
                 }
               });
 
@@ -237,15 +233,15 @@ jobs:
               }
             }
 
-            Future<void> _cycleLanguage() async {
+            Future _cycleLanguage() async {
               final langs = ['ar', 'fr', 'en'];
-              final next = langs[(langs.indexOf(_lang) + 1) % langs.length];
+              final next = langs[(langs.indexOf(_lang) + 1) % 3];
               final prefs = await SharedPreferences.getInstance();
               await prefs.setString('lang', next);
               setState(() => _lang = next);
             }
 
-            Future<void> _toggleFavorite(Map<String, String> ch) async {
+            Future _toggleFavorite(Map ch) async {
               final prefs = await SharedPreferences.getInstance();
               final exists = _favorites.any((x) => x['url'] == ch['url']);
               setState(() {
@@ -259,9 +255,9 @@ jobs:
               await prefs.setString('favs', jsonEncode(_favorites));
             }
 
-            bool _isFav(Map<String, String> ch) => _favorites.any((x) => x['url'] == ch['url']);
+            bool _isFav(Map ch) => _favorites.any((x) => x['url'] == ch['url']);
 
-            Future<void> _addToRecent(Map<String, String> ch) async {
+            Future _addToRecent(Map ch) async {
               final prefs = await SharedPreferences.getInstance();
               _recents.removeWhere((x) => x['url'] == ch['url']);
               _recents.insert(0, ch);
@@ -269,7 +265,7 @@ jobs:
               await prefs.setString('recents', jsonEncode(_recents));
             }
 
-            Future<void> _loginXtream() async {
+            Future _loginXtream() async {
               String h = _hostCtrl.text.trim();
               if (h.endsWith('/')) h = h.substring(0, h.length - 1);
               String u = _userCtrl.text.trim();
@@ -286,8 +282,9 @@ jobs:
                 _customStatus = '';
               });
 
-              final headers = {'User-Agent': _engines[_engineIdx]['ua']!};
-              Map<String, Map<String, List>>> temp = {
+              final ua = _engines[_engineIdx]['ua'].toString();
+              final headers = {'User-Agent': ua};
+              Map temp = {
                 'live': {'ALL': []},
                 'movies': {'ALL': []},
                 'series': {'ALL': []},
@@ -295,7 +292,7 @@ jobs:
 
               try {
                 final lCatRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_live_categories'), headers: headers);
-                Map<String, String> lCats = {};
+                Map lCats = {};
                 if (lCatRes.statusCode == 200) {
                   for (var c in jsonDecode(lCatRes.body)) {
                     lCats[c['category_id'].toString()] = c['category_name'].toString();
@@ -304,7 +301,7 @@ jobs:
                 final liveRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_live_streams'), headers: headers);
                 if (liveRes.statusCode == 200) {
                   for (var st in jsonDecode(liveRes.body)) {
-                    String grp = lCats[st['category_id'].toString()] ?? 'Live TV';
+                    String grp = (lCats[st['category_id'].toString()] ?? 'Live TV').toString();
                     String sid = st['stream_id'].toString();
                     var item = {
                       'name': st['name'].toString(),
@@ -312,13 +309,14 @@ jobs:
                       'm3u8': '$h/live/$u/$p/$sid.m3u8',
                       'group': grp
                     };
-                    temp['live']!['ALL']!.add(item);
-                    temp['live']!.putIfAbsent(grp, () => []).add(item);
+                    (temp['live']['ALL'] as List).add(item);
+                    temp['live'].putIfAbsent(grp, () => []);
+                    (temp['live'][grp] as List).add(item);
                   }
                 }
 
                 final vCatRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_vod_categories'), headers: headers);
-                Map<String, String> vCats = {};
+                Map vCats = {};
                 if (vCatRes.statusCode == 200) {
                   for (var c in jsonDecode(vCatRes.body)) {
                     vCats[c['category_id'].toString()] = c['category_name'].toString();
@@ -327,17 +325,18 @@ jobs:
                 final vodRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_vod_streams'), headers: headers);
                 if (vodRes.statusCode == 200) {
                   for (var st in jsonDecode(vodRes.body)) {
-                    String grp = vCats[st['category_id'].toString()] ?? 'Movies';
+                    String grp = (vCats[st['category_id'].toString()] ?? 'Movies').toString();
                     String sid = st['stream_id'].toString();
                     String ext = (st['container_extension'] ?? 'mp4').toString();
                     var item = {'name': st['name'].toString(), 'url': '$h/movie/$u/$p/$sid.$ext', 'group': grp};
-                    temp['movies']!['ALL']!.add(item);
-                    temp['movies']!.putIfAbsent(grp, () => []).add(item);
+                    (temp['movies']['ALL'] as List).add(item);
+                    temp['movies'].putIfAbsent(grp, () => []);
+                    (temp['movies'][grp] as List).add(item);
                   }
                 }
 
                 final sCatRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_series_categories'), headers: headers);
-                Map<String, String> sCats = {};
+                Map sCats = {};
                 if (sCatRes.statusCode == 200) {
                   for (var c in jsonDecode(sCatRes.body)) {
                     sCats[c['category_id'].toString()] = c['category_name'].toString();
@@ -346,12 +345,13 @@ jobs:
                 final serRes = await http.get(Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_series'), headers: headers);
                 if (serRes.statusCode == 200) {
                   for (var st in jsonDecode(serRes.body)) {
-                    String grp = sCats[st['category_id'].toString()] ?? 'Series';
+                    String grp = (sCats[st['category_id'].toString()] ?? 'Series').toString();
                     String sid = st['series_id'].toString();
                     String sName = st['name'].toString();
                     var item = {'name': '🍿 $sName', 'url': 'series://$h|$u|$p|$sid', 'group': grp};
-                    temp['series']!['ALL']!.add(item);
-                    temp['series']!.putIfAbsent(grp, () => []).add(item);
+                    (temp['series']['ALL'] as List).add(item);
+                    temp['series'].putIfAbsent(grp, () => []);
+                    (temp['series'][grp] as List).add(item);
                   }
                 }
 
@@ -364,7 +364,7 @@ jobs:
                   } else if (_currentTab == 'recent') {
                     _currentChannels = _recents;
                   } else {
-                    _currentChannels = _data[_currentTab]!['ALL'] ?? [];
+                    _currentChannels = _data[_currentTab]['ALL'] ?? [];
                   }
                   _statusKey = 'loaded';
                 });
@@ -373,7 +373,7 @@ jobs:
               }
             }
 
-            Future<void> _loadM3U() async {
+            Future _loadM3U() async {
               String url = _m3uCtrl.text.trim();
               if (url.isEmpty) return;
               final prefs = await SharedPreferences.getInstance();
@@ -384,9 +384,10 @@ jobs:
               });
 
               try {
-                final res = await http.get(Uri.parse(url), headers: {'User-Agent': _engines[_engineIdx]['ua']!});
+                final ua = _engines[_engineIdx]['ua'].toString();
+                final res = await http.get(Uri.parse(url), headers: {'User-Agent': ua});
                 if (res.statusCode == 200) {
-                  Map<String, Map<String, List>>> temp = {
+                  Map temp = {
                     'live': {'ALL': []},
                     'movies': {'ALL': []},
                     'series': {'ALL': []},
@@ -399,7 +400,7 @@ jobs:
                     String line = raw.trim();
                     if (line.startsWith('#EXTINF')) {
                       final m = grpReg.firstMatch(line);
-                      curGrp = (m != null && m.group(1)!.isNotEmpty) ? m.group(1)! : 'General';
+                      curGrp = (m != null && m.group(1) != null && m.group(1)!.isNotEmpty) ? m.group(1)! : 'General';
                       final parts = line.split(',');
                       curName = parts.length > 1 ? parts.sublist(1).join(',').trim() : 'Stream';
                     } else if (line.startsWith('http')) {
@@ -407,8 +408,9 @@ jobs:
                       if (line.contains('/movie/') || line.endsWith('.mp4') || line.endsWith('.mkv')) sec = 'movies';
                       if (line.contains('/series/')) sec = 'series';
                       var item = {'name': curName, 'url': line, 'group': curGrp};
-                      temp[sec]!['ALL']!.add(item);
-                      temp[sec]!.putIfAbsent(curGrp, () => []).add(item);
+                      (temp[sec]['ALL'] as List).add(item);
+                      temp[sec].putIfAbsent(curGrp, () => []);
+                      (temp[sec][curGrp] as List).add(item);
                     }
                   }
                   setState(() {
@@ -433,8 +435,8 @@ jobs:
               return 16 / 9;
             }
 
-            Future<void> _playChannel(Map<String, String> ch, {bool isReconnect = false, bool useFallbackM3u8 = false}) async {
-              String url = (useFallbackM3u8 && ch['m3u8'] != null) ? ch['m3u8']! : ch['url']!;
+            Future _playChannel(Map ch, {bool isReconnect = false, bool useFallbackM3u8 = false}) async {
+              String url = (useFallbackM3u8 && ch['m3u8'] != null) ? ch['m3u8'].toString() : ch['url'].toString();
               if (url.startsWith('series://')) {
                 _loadSeriesEpisodes(url);
                 return;
@@ -449,10 +451,11 @@ jobs:
               await _videoController?.dispose();
               _chewieController?.dispose();
 
+              final ua = _engines[_engineIdx]['ua'].toString();
               _videoController = VideoPlayerController.networkUrl(
                 Uri.parse(url),
                 httpHeaders: {
-                  'User-Agent': _engines[_engineIdx]['ua']!,
+                  'User-Agent': ua,
                   'Connection': 'keep-alive',
                 },
               );
@@ -506,20 +509,21 @@ jobs:
               setState(() {});
             }
 
-            Future<void> _loadSeriesEpisodes(String rawUrl) async {
+            Future _loadSeriesEpisodes(String rawUrl) async {
               final parts = rawUrl.replaceFirst('series://', '').split('|');
               if (parts.length < 4) return;
               String h = parts[0], u = parts[1], p = parts[2], sid = parts[3];
               setState(() => _statusKey = 'loading');
               try {
+                final ua = _engines[_engineIdx]['ua'].toString();
                 final res = await http.get(
                   Uri.parse('$h/player_api.php?username=$u&password=$p&action=get_series_info&series_id=$sid'),
-                  headers: {'User-Agent': _engines[_engineIdx]['ua']!},
+                  headers: {'User-Agent': ua},
                 );
                 if (res.statusCode == 200) {
                   final decoded = jsonDecode(res.body);
                   final epsMap = decoded['episodes'];
-                  List> epList = [];
+                  List epList = [];
                   if (epsMap is Map) {
                     epsMap.forEach((season, eps) {
                       for (var ep in eps) {
@@ -607,20 +611,20 @@ jobs:
               final isRtl = _lang == 'ar';
               final cats = (_currentTab == 'fav' || _currentTab == 'recent')
                   ? ['ALL']
-                  : _data[_currentTab]!.keys.toList();
+                  : (_data[_currentTab] as Map).keys.toList();
 
               final q = _searchCtrl.text.trim().toLowerCase();
               final filteredChannels = _currentChannels.where((c) =>
-                q.isEmpty || c['name']!.toLowerCase().contains(q)
+                q.isEmpty || c['name'].toString().toLowerCase().contains(q)
               ).toList();
 
-              final liveCount = _data['live']!['ALL']!.length;
-              final moviesCount = _data['movies']!['ALL']!.length;
-              final seriesCount = _data['series']!['ALL']!.length;
+              final liveCount = (_data['live']['ALL'] as List).length;
+              final moviesCount = (_data['movies']['ALL'] as List).length;
+              final seriesCount = (_data['series']['ALL'] as List).length;
               final favCount = _favorites.length;
               final recCount = _recents.length;
-              final engShort = _engines[_engineIdx]['name']!.split(' ')[0];
-              final activeName = _activeChannel != null ? _activeChannel!['name']! : '';
+              final engShort = _engines[_engineIdx]['name'].toString().split(' ')[0];
+              final activeName = _activeChannel != null ? _activeChannel!['name'].toString() : '';
 
               return Directionality(
                 textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
@@ -660,29 +664,29 @@ jobs:
                                 const SizedBox(width: 5),
                                 _tabBtn('recent', '${tr("recent")} ($recCount)'),
                                 const SizedBox(width: 10),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF1B2030),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: Colors.white24),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<int>(
-                                      value: _engineIdx,
-                                      dropdownColor: const Color(0xFF161A28),
+                                PopupMenuButton(
+                                  color: const Color(0xFF161A28),
+                                  onSelected: (v) async {
+                                    int idx = v as int;
+                                    final prefs = await SharedPreferences.getInstance();
+                                    await prefs.setInt('engine', idx);
+                                    setState(() => _engineIdx = idx);
+                                    if (_activeChannel != null) _playChannel(_activeChannel!, isReconnect: true);
+                                  },
+                                  itemBuilder: (_) => List.generate(_engines.length, (idx) => PopupMenuItem(
+                                    value: idx,
+                                    child: Text('⚙️ ${_engines[idx]["name"]}', style: const TextStyle(color: Color(0xFFF5C518), fontSize: 12)),
+                                  )),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF1B2030),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: Colors.white24),
+                                    ),
+                                    child: Text(
+                                      '⚙️ ${_engines[_engineIdx]["name"]}',
                                       style: const TextStyle(color: Color(0xFFF5C518), fontSize: 11, fontWeight: FontWeight.bold),
-                                      items: List.generate(_engines.length, (idx) => DropdownMenuItem(
-                                        value: idx,
-                                        child: Text('⚙️ ${_engines[idx]["name"]}'),
-                                      )),
-                                      onChanged: (v) async {
-                                        if (v == null) return;
-                                        final prefs = await SharedPreferences.getInstance();
-                                        await prefs.setInt('engine', v);
-                                        setState(() => _engineIdx = v);
-                                        if (_activeChannel != null) _playChannel(_activeChannel!, isReconnect: true);
-                                      },
                                     ),
                                   ),
                                 ),
@@ -721,16 +725,16 @@ jobs:
                                     child: ListView.builder(
                                       itemCount: cats.length,
                                       itemBuilder: (_, i) {
-                                        String c = cats[i];
+                                        String c = cats[i].toString();
                                         String label = c == 'ALL' ? tr('all') : c;
-                                        int count = _data[_currentTab]![c]?.length ?? 0;
+                                        int count = (_data[_currentTab][c] as List?)?.length ?? 0;
                                         bool sel = c == _selectedCat;
                                         return InkWell(
                                           onTap: () {
                                             setState(() {
                                               _selectedCat = c;
                                               _insideSeriesEpisodes = false;
-                                              _currentChannels = _data[_currentTab]![c] ?? [];
+                                              _currentChannels = _data[_currentTab][c] ?? [];
                                             });
                                           },
                                           child: Container(
@@ -795,7 +799,7 @@ jobs:
                                               onPressed: () {
                                                 setState(() {
                                                   _insideSeriesEpisodes = false;
-                                                  _currentChannels = _data['series']![_selectedCat] ?? [];
+                                                  _currentChannels = _data['series'][_selectedCat] ?? [];
                                                 });
                                               },
                                               child: Text(tr('back_series'), style: const TextStyle(fontSize: 11)),
@@ -806,10 +810,10 @@ jobs:
                                         child: ListView.builder(
                                           itemCount: filteredChannels.length,
                                           itemBuilder: (_, i) {
-                                            final ch = filteredChannels[i];
+                                            final ch = filteredChannels[i] as Map;
                                             final isPlaying = _activeChannel != null && _activeChannel!['url'] == ch['url'];
                                             final fav = _isFav(ch);
-                                            final chName = ch['name'] ?? '';
+                                            final chName = (ch['name'] ?? '').toString();
                                             return InkWell(
                                               onTap: () => _playChannel(ch),
                                               child: Container(
@@ -931,7 +935,8 @@ jobs:
                                             const SizedBox(width: 6),
                                             InkWell(
                                               onTap: () {
-                                                setState(() => _aspectIdx = (_aspectIdx + 1) % _aspectNames.length);
+                                                int len = _aspectNames.length;
+                                                setState(() => _aspectIdx = (_aspectIdx + 1) % len);
                                                 _buildChewie();
                                               },
                                               child: Container(
@@ -995,7 +1000,7 @@ jobs:
                       _currentChannels = List.from(_recents);
                     } else {
                       _selectedCat = 'ALL';
-                      _currentChannels = _data[key]!['ALL'] ?? [];
+                      _currentChannels = _data[key]['ALL'] ?? [];
                     }
                   });
                 },
