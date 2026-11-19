@@ -90,6 +90,7 @@ jobs:
             int _engineIdx = 0;
             int _aspectIdx = 0;
             bool _showSidebar = true;
+            bool _isFullScreen = false;
             bool _antiFreeze = true;
 
             final List _engines = [
@@ -103,7 +104,7 @@ jobs:
 
             final Map _i18n = {
               'ar': {
-                'ready': 'جاهز (يدعم اللمس وتيليكوموند التلفاز)',
+                'ready': 'جاهز (اضغط مرتين بـ OK على القناة لتكبير الشاشة)',
                 'loading': 'جاري جلب القنوات والأفلام...',
                 'loaded': 'تم التحميل بنجاح!',
                 'error': 'خطأ في الاتصال بالسيرفر',
@@ -115,7 +116,7 @@ jobs:
                 'all': 'الكل',
                 'search': '🔍 بحث سريع...',
                 'server': '🔑 السيرفر',
-                'playing': 'يشتغل الآن:',
+                'playing': 'يشتغل الآن (OK للتكبير):',
                 'choose': 'اختر قناة أو فيلماً لبدء البث',
                 'reconnecting': '⚡ إعادة تثبيت البث تلقائياً...',
                 'server_title': 'إعدادات السيرفر - كيبورد التلفاز الشامل',
@@ -124,10 +125,11 @@ jobs:
                 'load_m3u': 'تحميل قائمة M3U',
                 'hide_list': 'وضع السينما',
                 'show_list': 'إظهار القائمة',
+                'full_screen': '🔲 ملء الشاشة',
                 'back_series': '🔙 رجوع للمسلسلات',
               },
               'fr': {
-                'ready': 'Prêt (Tactile & Télécommande TV)',
+                'ready': 'Prêt (Double OK sur la chaîne pour Plein Écran)',
                 'loading': 'Chargement des chaînes & VOD...',
                 'loaded': 'Chargé avec succès !',
                 'error': 'Erreur de connexion au serveur',
@@ -139,7 +141,7 @@ jobs:
                 'all': 'Tout',
                 'search': '🔍 Recherche rapide...',
                 'server': '🔑 Serveur',
-                'playing': 'En cours :',
+                'playing': 'En cours (OK = Plein écran) :',
                 'choose': 'Sélectionnez une chaîne ou un film',
                 'reconnecting': '⚡ Reconnexion Anti-Freeze...',
                 'server_title': 'Serveur - Clavier TV Complet',
@@ -148,10 +150,11 @@ jobs:
                 'load_m3u': 'Charger M3U',
                 'hide_list': 'Mode Cinéma',
                 'show_list': 'Afficher Liste',
+                'full_screen': '🔲 Plein Écran',
                 'back_series': '🔙 Retour aux Séries',
               },
               'en': {
-                'ready': 'Ready (Touch & TV Remote Supported)',
+                'ready': 'Ready (Press OK twice on channel for Full Screen)',
                 'loading': 'Loading Live, Movies & Series...',
                 'loaded': 'Loaded Successfully!',
                 'error': 'Server Connection Error',
@@ -163,7 +166,7 @@ jobs:
                 'all': 'All',
                 'search': '🔍 Quick search...',
                 'server': '🔑 Server',
-                'playing': 'Now Playing:',
+                'playing': 'Playing (OK = Full Screen):',
                 'choose': 'Select a channel or movie to play',
                 'reconnecting': '⚡ Auto-Reconnecting Stream...',
                 'server_title': 'Server Setup - Full TV Keyboard',
@@ -172,6 +175,7 @@ jobs:
                 'load_m3u': 'Load M3U Playlist',
                 'hide_list': 'Cinema Mode',
                 'show_list': 'Show Lists',
+                'full_screen': '🔲 Full Screen',
                 'back_series': '🔙 Back to Series',
               }
             };
@@ -457,6 +461,12 @@ jobs:
                 return;
               }
 
+              // إلا كانت القناة خدامة أصلاً وعاود ورك عليها بـ OK، كتكبر الشاشة 100% أوتوماتيكياً!
+              if (!isReconnect && _activeChannel != null && _activeChannel!['url'] == ch['url']) {
+                setState(() => _isFullScreen = true);
+                return;
+              }
+
               _activeChannel = ch;
               if (!isReconnect) {
                 _addToRecent(ch);
@@ -498,6 +508,7 @@ jobs:
                 aspectRatio: _getAspectRatio(),
                 allowFullScreen: true,
                 allowedScreenSleep: false,
+                showControls: false,
                 overlay: IgnorePointer(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
@@ -871,297 +882,344 @@ jobs:
               final engShort = _engines[_engineIdx]['name'].toString().split(' ')[0];
               final activeName = _activeChannel != null ? _activeChannel!['name'].toString() : '';
 
-              return Directionality(
-                textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-                child: Scaffold(
-                  body: SafeArea(
-                    child: Column(
-                      children: [
-                        Container(
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF111520),
-                            border: Border(bottom: BorderSide(color: Color(0xFFE50914), width: 2)),
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
+              return PopScope(
+                canPop: !_isFullScreen,
+                onPopInvokedWithResult: (didPop, _) {
+                  if (!didPop && _isFullScreen) {
+                    setState(() => _isFullScreen = false);
+                  }
+                },
+                child: Directionality(
+                  textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+                  child: Scaffold(
+                    body: SafeArea(
+                      child: Column(
+                        children: [
+                          if (!_isFullScreen)
+                            Container(
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF111520),
+                                border: Border(bottom: BorderSide(color: Color(0xFFE50914), width: 2)),
+                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE50914),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text(
+                                        '⚡ DINO ALLACH PRO',
+                                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    _tabBtn('live', '${tr("live")} ($liveCount)', autofocus: true),
+                                    const SizedBox(width: 5),
+                                    _tabBtn('movies', '${tr("movies")} ($moviesCount)'),
+                                    const SizedBox(width: 5),
+                                    _tabBtn('series', '${tr("series")} ($seriesCount)'),
+                                    const SizedBox(width: 5),
+                                    _tabBtn('fav', '${tr("fav")} ($favCount)'),
+                                    const SizedBox(width: 5),
+                                    _tabBtn('recent', '${tr("recent")} ($recCount)'),
+                                    const SizedBox(width: 8),
+                                    _tvButton(
+                                      onTap: _cycleEngine,
+                                      bgColor: const Color(0xFF1B2030),
+                                      child: Text(
+                                        '⚙️ ${_engines[_engineIdx]["name"]}',
+                                        style: const TextStyle(color: Color(0xFFF5C518), fontSize: 11, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    _tvButton(
+                                      onTap: _cycleLanguage,
+                                      bgColor: const Color(0xFF1B2030),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.language, size: 14, color: Color(0xFFF5C518)),
+                                          const SizedBox(width: 4),
+                                          Text(_lang.toUpperCase(), style: const TextStyle(color: Color(0xFFF5C518), fontWeight: FontWeight.bold, fontSize: 11)),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    _tvButton(
+                                      onTap: _openLoginModal,
+                                      bgColor: const Color(0xFFE50914),
+                                      child: Text(tr('server'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          Expanded(
                             child: Row(
                               children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFE50914),
-                                    borderRadius: BorderRadius.circular(6),
+                                if (_showSidebar && !_isFullScreen) ...[
+                                  if (_currentTab != 'fav' && _currentTab != 'recent')
+                                    Container(
+                                      width: 150,
+                                      color: const Color(0xFF10131D),
+                                      child: ListView.builder(
+                                        itemCount: cats.length,
+                                        itemBuilder: (_, i) {
+                                          String c = cats[i].toString();
+                                          String label = c == 'ALL' ? tr('all') : c;
+                                          int count = (_data[_currentTab][c] as List?)?.length ?? 0;
+                                          bool sel = c == _selectedCat;
+                                          return Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                            child: _tvButton(
+                                              isSelected: sel,
+                                              bgColor: const Color(0xFF151926),
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+                                              onTap: () {
+                                                setState(() {
+                                                  _selectedCat = c;
+                                                  _insideSeriesEpisodes = false;
+                                                  _currentChannels = _data[_currentTab][c] ?? [];
+                                                });
+                                              },
+                                              child: Text(
+                                                '$label ($count)',
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontWeight: sel ? FontWeight.bold : FontWeight.normal,
+                                                  color: sel ? Colors.black : Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  Container(
+                                    width: 220,
+                                    color: const Color(0xFF151926),
+                                    child: Column(
+                                      children: [
+                                        if (_insideSeriesEpisodes)
+                                          Padding(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                            child: SizedBox(
+                                              width: double.infinity,
+                                              child: _tvButton(
+                                                bgColor: const Color(0xFF262D45),
+                                                onTap: () {
+                                                  setState(() {
+                                                    _insideSeriesEpisodes = false;
+                                                    _currentChannels = _data['series'][_selectedCat] ?? [];
+                                                  });
+                                                },
+                                                child: Center(child: Text(tr('back_series'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
+                                              ),
+                                            ),
+                                          ),
+                                        Expanded(
+                                          child: ListView.builder(
+                                            itemCount: filteredChannels.length,
+                                            itemBuilder: (_, i) {
+                                              final ch = filteredChannels[i] as Map;
+                                              final isPlaying = _activeChannel != null && _activeChannel!['url'] == ch['url'];
+                                              final fav = _isFav(ch);
+                                              final chName = (ch['name'] ?? '').toString();
+                                              return Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                                child: _tvButton(
+                                                  isSelected: isPlaying,
+                                                  bgColor: const Color(0xFF1A1F30),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                                  onTap: () => _playChannel(ch),
+                                                  child: Row(
+                                                    children: [
+                                                      Expanded(
+                                                        child: Text(
+                                                          isPlaying ? '🔲 ${i + 1}. $chName' : '${i + 1}. $chName',
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: isPlaying ? Colors.black : Colors.white,
+                                                            fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      GestureDetector(
+                                                        onTap: () => _toggleFavorite(ch),
+                                                        child: Padding(
+                                                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                                                          child: Icon(
+                                                            fav ? Icons.star : Icons.star_border,
+                                                            size: 17,
+                                                            color: fav ? (isPlaying ? Colors.black : const Color(0xFFF5C518)) : Colors.white38,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  child: const Text(
-                                    '⚡ DINO ALLACH PRO',
-                                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                                ],
+                                Expanded(
+                                  child: Container(
+                                    color: Colors.black,
+                                    child: Column(
+                                      children: [
+                                        Expanded(
+                                          child: Focus(
+                                            autofocus: _isFullScreen,
+                                            onKeyEvent: (node, event) {
+                                              if (event is KeyDownEvent) {
+                                                if (event.logicalKey == LogicalKeyboardKey.select ||
+                                                    event.logicalKey == LogicalKeyboardKey.enter ||
+                                                    event.logicalKey == LogicalKeyboardKey.numpadEnter ||
+                                                    event.logicalKey == LogicalKeyboardKey.gameButtonA) {
+                                                  setState(() => _isFullScreen = !_isFullScreen);
+                                                  return KeyEventResult.handled;
+                                                }
+                                                if (_isFullScreen &&
+                                                    (event.logicalKey == LogicalKeyboardKey.escape ||
+                                                     event.logicalKey == LogicalKeyboardKey.goBack ||
+                                                     event.logicalKey == LogicalKeyboardKey.browserBack)) {
+                                                  setState(() => _isFullScreen = false);
+                                                  return KeyEventResult.handled;
+                                                }
+                                              }
+                                              return KeyEventResult.ignored;
+                                            },
+                                            child: GestureDetector(
+                                              onTap: () => setState(() => _isFullScreen = !_isFullScreen),
+                                              child: Container(
+                                                color: Colors.black,
+                                                width: double.infinity,
+                                                height: double.infinity,
+                                                child: Center(
+                                                  child: _chewieController != null && _videoController!.value.isInitialized
+                                                      ? Chewie(controller: _chewieController!)
+                                                      : Column(
+                                                          mainAxisAlignment: MainAxisAlignment.center,
+                                                          children: [
+                                                            const Icon(Icons.live_tv_rounded, size: 58, color: Color(0xFFE50914)),
+                                                            const SizedBox(height: 10),
+                                                            const Text(
+                                                              'DINO ALLACH PRO',
+                                                              style: TextStyle(color: Color(0xFFF5C518), fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.5),
+                                                            ),
+                                                            const SizedBox(height: 4),
+                                                            Text(
+                                                              '${_engines[_engineIdx]["name"]} • Double OK = Full Screen',
+                                                              style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        if (!_isFullScreen)
+                                          Container(
+                                            color: const Color(0xFF111520),
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                            child: Row(
+                                              children: [
+                                                _tvButton(
+                                                  bgColor: const Color(0xFFE50914),
+                                                  onTap: () => setState(() => _isFullScreen = true),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                                                  child: Text(tr('full_screen'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                _tvButton(
+                                                  onTap: () => setState(() => _showSidebar = !_showSidebar),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(_showSidebar ? Icons.fullscreen : Icons.view_sidebar, size: 15, color: const Color(0xFFF5C518)),
+                                                      const SizedBox(width: 4),
+                                                      Text(_showSidebar ? tr('hide_list') : tr('show_list'), style: const TextStyle(fontSize: 11, color: Colors.white)),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Text(
+                                                    _activeChannel != null
+                                                        ? '[$engShort] ${tr("playing")} $activeName'
+                                                        : (_customStatus.isNotEmpty ? _customStatus : tr(_statusKey)),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(color: Color(0xFFF5C518), fontSize: 12, fontWeight: FontWeight.bold),
+                                                  ),
+                                                ),
+                                                if (_activeChannel != null) ...[
+                                                  _tvButton(
+                                                    onTap: () => _toggleFavorite(_activeChannel!),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                                                    child: Icon(
+                                                      _isFav(_activeChannel!) ? Icons.star : Icons.star_border,
+                                                      size: 15,
+                                                      color: const Color(0xFFF5C518),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                ],
+                                                _tvButton(
+                                                  onTap: () => setState(() => _antiFreeze = !_antiFreeze),
+                                                  bgColor: _antiFreeze ? const Color(0xFF143824) : const Color(0xFF252A3A),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                                                  child: Text(
+                                                    _antiFreeze ? '🛡️ Anti-Freeze: ON' : '🛡️ Anti-Freeze: OFF',
+                                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _antiFreeze ? Colors.greenAccent : Colors.white54),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                _tvButton(
+                                                  onTap: () {
+                                                    int len = _aspectNames.length;
+                                                    setState(() => _aspectIdx = (_aspectIdx + 1) % len);
+                                                    _buildChewie();
+                                                  },
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                                  child: Text(
+                                                    '📐 ${_aspectNames[_aspectIdx]}',
+                                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                if (_activeChannel != null)
+                                                  _tvButton(
+                                                    onTap: () => _playChannel(_activeChannel!, isReconnect: true),
+                                                    bgColor: const Color(0xFFE50914),
+                                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+                                                    child: const Icon(Icons.refresh, size: 15, color: Colors.white),
+                                                  ),
+                                              ],
+                                            ),
+                                          ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                _tabBtn('live', '${tr("live")} ($liveCount)', autofocus: true),
-                                const SizedBox(width: 5),
-                                _tabBtn('movies', '${tr("movies")} ($moviesCount)'),
-                                const SizedBox(width: 5),
-                                _tabBtn('series', '${tr("series")} ($seriesCount)'),
-                                const SizedBox(width: 5),
-                                _tabBtn('fav', '${tr("fav")} ($favCount)'),
-                                const SizedBox(width: 5),
-                                _tabBtn('recent', '${tr("recent")} ($recCount)'),
-                                const SizedBox(width: 8),
-                                _tvButton(
-                                  onTap: _cycleEngine,
-                                  bgColor: const Color(0xFF1B2030),
-                                  child: Text(
-                                    '⚙️ ${_engines[_engineIdx]["name"]}',
-                                    style: const TextStyle(color: Color(0xFFF5C518), fontSize: 11, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                _tvButton(
-                                  onTap: _cycleLanguage,
-                                  bgColor: const Color(0xFF1B2030),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.language, size: 14, color: Color(0xFFF5C518)),
-                                      const SizedBox(width: 4),
-                                      Text(_lang.toUpperCase(), style: const TextStyle(color: Color(0xFFF5C518), fontWeight: FontWeight.bold, fontSize: 11)),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                _tvButton(
-                                  onTap: _openLoginModal,
-                                  bgColor: const Color(0xFFE50914),
-                                  child: Text(tr('server'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),
                                 ),
                               ],
                             ),
                           ),
-                        ),
-                        Expanded(
-                          child: Row(
-                            children: [
-                              if (_showSidebar) ...[
-                                if (_currentTab != 'fav' && _currentTab != 'recent')
-                                  Container(
-                                    width: 150,
-                                    color: const Color(0xFF10131D),
-                                    child: ListView.builder(
-                                      itemCount: cats.length,
-                                      itemBuilder: (_, i) {
-                                        String c = cats[i].toString();
-                                        String label = c == 'ALL' ? tr('all') : c;
-                                        int count = (_data[_currentTab][c] as List?)?.length ?? 0;
-                                        bool sel = c == _selectedCat;
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                          child: _tvButton(
-                                            isSelected: sel,
-                                            bgColor: const Color(0xFF151926),
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
-                                            onTap: () {
-                                              setState(() {
-                                                _selectedCat = c;
-                                                _insideSeriesEpisodes = false;
-                                                _currentChannels = _data[_currentTab][c] ?? [];
-                                              });
-                                            },
-                                            child: Text(
-                                              '$label ($count)',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: sel ? FontWeight.bold : FontWeight.normal,
-                                                color: sel ? Colors.black : Colors.white,
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                Container(
-                                  width: 220,
-                                  color: const Color(0xFF151926),
-                                  child: Column(
-                                    children: [
-                                      if (_insideSeriesEpisodes)
-                                        Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                                          child: SizedBox(
-                                            width: double.infinity,
-                                            child: _tvButton(
-                                              bgColor: const Color(0xFF262D45),
-                                              onTap: () {
-                                                setState(() {
-                                                  _insideSeriesEpisodes = false;
-                                                  _currentChannels = _data['series'][_selectedCat] ?? [];
-                                                });
-                                              },
-                                              child: Center(child: Text(tr('back_series'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold))),
-                                            ),
-                                          ),
-                                        ),
-                                      Expanded(
-                                        child: ListView.builder(
-                                          itemCount: filteredChannels.length,
-                                          itemBuilder: (_, i) {
-                                            final ch = filteredChannels[i] as Map;
-                                            final isPlaying = _activeChannel != null && _activeChannel!['url'] == ch['url'];
-                                            final fav = _isFav(ch);
-                                            final chName = (ch['name'] ?? '').toString();
-                                            return Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                              child: _tvButton(
-                                                isSelected: isPlaying,
-                                                bgColor: const Color(0xFF1A1F30),
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                                                onTap: () => _playChannel(ch),
-                                                child: Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: Text(
-                                                        '${i + 1}. $chName',
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color: isPlaying ? Colors.black : Colors.white,
-                                                          fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    GestureDetector(
-                                                      onTap: () => _toggleFavorite(ch),
-                                                      child: Padding(
-                                                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                                                        child: Icon(
-                                                          fav ? Icons.star : Icons.star_border,
-                                                          size: 17,
-                                                          color: fav ? (isPlaying ? Colors.black : const Color(0xFFF5C518)) : Colors.white38,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                              Expanded(
-                                child: Container(
-                                  color: Colors.black,
-                                  child: Column(
-                                    children: [
-                                      Expanded(
-                                        child: Center(
-                                          child: _chewieController != null && _videoController!.value.isInitialized
-                                              ? Chewie(controller: _chewieController!)
-                                              : Column(
-                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                  children: [
-                                                    const Icon(Icons.live_tv_rounded, size: 58, color: Color(0xFFE50914)),
-                                                    const SizedBox(height: 10),
-                                                    const Text(
-                                                      'DINO ALLACH PRO',
-                                                      style: TextStyle(color: Color(0xFFF5C518), fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.5),
-                                                    ),
-                                                    const SizedBox(height: 4),
-                                                    Text(
-                                                      '${_engines[_engineIdx]["name"]} • Full TV Keyboard + Symbols',
-                                                      style: const TextStyle(color: Colors.white54, fontSize: 12),
-                                                    ),
-                                                  ],
-                                                ),
-                                        ),
-                                      ),
-                                      Container(
-                                        color: const Color(0xFF111520),
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                        child: Row(
-                                          children: [
-                                            _tvButton(
-                                              onTap: () => setState(() => _showSidebar = !_showSidebar),
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                                              child: Row(
-                                                children: [
-                                                  Icon(_showSidebar ? Icons.fullscreen : Icons.view_sidebar, size: 15, color: const Color(0xFFF5C518)),
-                                                  const SizedBox(width: 4),
-                                                  Text(_showSidebar ? tr('hide_list') : tr('show_list'), style: const TextStyle(fontSize: 11, color: Colors.white)),
-                                                ],
-                                              ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                _activeChannel != null
-                                                    ? '[$engShort] ${tr("playing")} $activeName'
-                                                    : (_customStatus.isNotEmpty ? _customStatus : tr(_statusKey)),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(color: Color(0xFFF5C518), fontSize: 12, fontWeight: FontWeight.bold),
-                                              ),
-                                            ),
-                                            if (_activeChannel != null) ...[
-                                              _tvButton(
-                                                onTap: () => _toggleFavorite(_activeChannel!),
-                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-                                                child: Icon(
-                                                  _isFav(_activeChannel!) ? Icons.star : Icons.star_border,
-                                                  size: 15,
-                                                  color: const Color(0xFFF5C518),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 6),
-                                            ],
-                                            _tvButton(
-                                              onTap: () => setState(() => _antiFreeze = !_antiFreeze),
-                                              bgColor: _antiFreeze ? const Color(0xFF143824) : const Color(0xFF252A3A),
-                                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-                                              child: Text(
-                                                _antiFreeze ? '🛡️ Anti-Freeze: ON' : '🛡️ Anti-Freeze: OFF',
-                                                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: _antiFreeze ? Colors.greenAccent : Colors.white54),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            _tvButton(
-                                              onTap: () {
-                                                int len = _aspectNames.length;
-                                                setState(() => _aspectIdx = (_aspectIdx + 1) % len);
-                                                _buildChewie();
-                                              },
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                                              child: Text(
-                                                '📐 ${_aspectNames[_aspectIdx]}',
-                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            if (_activeChannel != null)
-                                              _tvButton(
-                                                onTap: () => _playChannel(_activeChannel!, isReconnect: true),
-                                                bgColor: const Color(0xFFE50914),
-                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-                                                child: const Icon(Icons.refresh, size: 15, color: Colors.white),
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -1210,4 +1268,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dino_allach_apk
-          path: /tmp/dino_allach.apk
+          path: /tmp/dino_allach_apk
