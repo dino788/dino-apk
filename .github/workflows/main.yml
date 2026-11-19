@@ -461,7 +461,6 @@ jobs:
                 return;
               }
 
-              // إلا كانت القناة خدامة أصلاً وعاود ورك عليها بـ OK، كتكبر الشاشة 100% أوتوماتيكياً!
               if (!isReconnect && _activeChannel != null && _activeChannel!['url'] == ch['url']) {
                 setState(() => _isFullScreen = true);
                 return;
@@ -1268,4 +1267,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dino_allach_apk
-          path: /tmp/dino_allach_apk
+          path: /tmp/dino_allach.apk
